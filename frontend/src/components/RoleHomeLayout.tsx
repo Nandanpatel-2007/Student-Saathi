@@ -1,8 +1,7 @@
 import { LogOut } from 'lucide-react'
-import { startTransition } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/useAuth'
+import { useLogout } from '../auth/useLogout'
 import { ROLE_LABEL } from '../auth/utils'
 import { roleHome } from '../content/auth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -11,21 +10,12 @@ import { Container } from './Container'
 import { Wordmark } from './Logo'
 import { ThemeToggle } from './ThemeToggle'
 
-/** Shared shell for /student, /faculty and /admin: top bar plus an empty-state card. */
+/** Shared shell for the placeholder homes (/student, /admin): top bar plus an empty-state card. */
 export function RoleHomeLayout({ role }: { role: Role }) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
+  const onLogout = useLogout()
   const { title, body, icon: Icon } = roleHome[role]
   useDocumentTitle(`${ROLE_LABEL[role]} | Student Saathi`)
-
-  const onLogout = () => {
-    // Navigate and clear the session in one transition so this protected page never
-    // re-renders as "anonymous" and bounces to /login before reaching "/".
-    startTransition(() => {
-      navigate('/', { replace: true })
-      logout()
-    })
-  }
 
   return (
     <div className="min-h-svh">

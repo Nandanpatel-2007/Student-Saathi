@@ -145,14 +145,10 @@ async function parseBody<S extends z.ZodType>(res: Response, schema: S): Promise
 }
 
 /**
- * Typed JSON request. The response body is validated against `schema`.
+ * Send a request and return the successful Response; every non-2xx becomes an ApiError.
  * Protected calls (`auth: true`) get one refresh + one retry on a 401, then the user is logged out.
  */
-export async function apiRequest<S extends z.ZodType>(
-  path: string,
-  schema: S,
-  { method = 'GET', body, auth = false }: RequestOptions = {},
-): Promise<z.infer<S>> {
+async function execute(path: string, { method = 'GET', body, auth = false }: RequestOptions): Promise<Response> {
   let res = await send(path, method, body, auth ? tokenStore.getAccess() : null)
 
   if (res.status === 401 && auth) {
@@ -165,5 +161,39 @@ export async function apiRequest<S extends z.ZodType>(
   }
 
   if (!res.ok) throw await toApiError(res)
+  return res
+}
+
+/**
+ * Typed JSON request. The response body is validated against `schema`.
+ * For 204 No Content responses pass `z.undefined()`.
+ */
+export async function apiRequest<S extends z.ZodType>(
+  path: string,
+  schema: S,
+  options: RequestOptions = {},
+): Promise<z.infer<S>> {
+  const res = await execute(path, options)
+  if (res.status === 204) {
+    const parsed = schema.safeParse(undefined)
+    if (parsed.success) return parsed.data
+    throw new ApiError(204, 'invalid_response', 'The server sent an unexpected response.')
+  }
   return parseBody(res, schema)
+}
+
+/** Authenticated file download (the bearer token can't be sent by a plain link). */
+export async function apiDownload(path: string): Promise<Blob> {
+  const res = await execute(path, { auth: true })
+  return res.blob()
+}
+
+/** Build "?a=1&b=2" from defined values; returns "" when nothing is set. */
+export function buildQuery(params: Record<string, string | number | undefined | null>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
 }
