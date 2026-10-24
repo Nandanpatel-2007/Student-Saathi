@@ -142,8 +142,10 @@ describe('computeTotals', () => {
 
 describe('greeting', () => {
   it('changes at noon and at five', () => {
-    expect(greeting(new Date(2026, 0, 1, 9))).toBe('Good morning')
-    expect(greeting(new Date(2026, 0, 1, 12))).toBe('Good afternoon')
-    expect(greeting(new Date(2026, 0, 1, 17))).toBe('Good evening')
+    // Hours are IST: 03:30Z is 09:00, 06:30Z is 12:00, 11:30Z is 17:00.
+    expect(greeting(new Date('2026-01-01T03:30:00Z'))).toBe('Good morning')
+    expect(greeting(new Date('2026-01-01T06:29:00Z'))).toBe('Good morning')
+    expect(greeting(new Date('2026-01-01T06:30:00Z'))).toBe('Good afternoon')
+    expect(greeting(new Date('2026-01-01T11:30:00Z'))).toBe('Good evening')
   })
 })

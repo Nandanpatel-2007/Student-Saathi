@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "apps.attendance",
     "apps.assessments",
     "apps.analytics",
+    "apps.assignments",
 ]
 
 MIDDLEWARE = [
@@ -105,3 +106,8 @@ ATTENDANCE_LATE_COUNTS_AS_PRESENT = env.bool("ATTENDANCE_LATE_COUNTS_AS_PRESENT"
 ATTENDANCE_EXCUSED_POLICY = env.str("ATTENDANCE_EXCUSED_POLICY", default="EXCLUDE").upper()
 PASS_MARK_PERCENT = env.float("PASS_MARK_PERCENT", default=40.0)
 SHARP_DROP_POINTS = env.float("SHARP_DROP_POINTS", default=15.0)
+
+# Assignment uploads. Files live under MEDIA_ROOT and are only ever served through an
+# authenticated endpoint; MEDIA_URL is deliberately left unset and no media route exists.
+MEDIA_ROOT = BASE_DIR / "media"
+ASSIGNMENT_MAX_UPLOAD_MB = env.int("ASSIGNMENT_MAX_UPLOAD_MB", default=10)

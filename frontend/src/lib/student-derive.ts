@@ -1,3 +1,4 @@
+import { istHour } from './format'
 import type { Alert } from './schemas'
 import type { SubjectStats } from './student-api'
 
@@ -96,7 +97,7 @@ export function computeTotals(subjects: readonly SubjectStats[]): StudentTotals 
 }
 
 export function greeting(date = new Date()): string {
-  const hour = date.getHours()
+  const hour = istHour(date)
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'

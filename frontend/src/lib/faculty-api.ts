@@ -1,7 +1,19 @@
 import { z } from 'zod'
 
 import { apiDownload, apiRequest, buildQuery } from './api'
-import { alertSchema, type Alert } from './schemas'
+import { saveBlob } from './download'
+import {
+  alertSchema,
+  paged,
+  sectionSchema,
+  studentBriefSchema,
+  subjectDetailSchema,
+  type Alert,
+  type Paged,
+  type Section,
+  type StudentBrief,
+  type Subject,
+} from './schemas'
 
 // ---------------------------------------------------------------- shared schemas
 
@@ -11,43 +23,9 @@ export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number]
 export const ASSESSMENT_TYPES = ['QUIZ', 'MIDTERM', 'ASSIGNMENT', 'PRACTICAL', 'OTHER'] as const
 export type AssessmentType = (typeof ASSESSMENT_TYPES)[number]
 
-const subjectSchema = z.object({
-  id: z.number(),
-  code: z.string(),
-  name: z.string(),
-  credits: z.number(),
-  semester: z.number(),
-})
+const subjectSchema = subjectDetailSchema
 
-const sectionSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  program: z.string(),
-  semester: z.number(),
-  academic_year: z.string(),
-})
-
-const studentBriefSchema = z.object({
-  id: z.number(),
-  roll_no: z.string(),
-  name: z.string(),
-})
-
-function paged<T extends z.ZodType>(item: T) {
-  return z.object({
-    items: z.array(item),
-    count: z.number(),
-    page: z.number(),
-    page_size: z.number(),
-    total_pages: z.number(),
-  })
-}
-
-export type Subject = z.infer<typeof subjectSchema>
-export type Section = z.infer<typeof sectionSchema>
-export type StudentBrief = z.infer<typeof studentBriefSchema>
-export type { Alert }
-export type Paged<T> = { items: T[]; count: number; page: number; page_size: number; total_pages: number }
+export type { Alert, Paged, Section, StudentBrief, Subject }
 
 // ---------------------------------------------------------------- classes
 
@@ -78,6 +56,8 @@ const classSummarySchema = z.object({
   section: sectionSchema,
   students: z.number(),
   sessions_held: z.number(),
+  /** Submitted assignments that still have no marks. */
+  submissions_to_grade: z.number(),
   /** Class average of the students' attendance percentages. */
   attendance_pct: z.number().nullable(),
   /** Class average of the students' average score percentages. */
@@ -130,14 +110,7 @@ export async function downloadClassCsv(
   type: 'attendance' | 'marks',
 ): Promise<void> {
   const blob = await apiDownload(`/faculty/classes/${c.assignment_id}/export${buildQuery({ type })}`)
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${c.subject.code}-${c.section.name}-${type}.csv`.replace(/\s+/g, '_')
-  document.body.append(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  saveBlob(blob, `${c.subject.code}-${c.section.name}-${type}.csv`.replace(/\s+/g, '_'))
 }
 
 // ---------------------------------------------------------------- attendance

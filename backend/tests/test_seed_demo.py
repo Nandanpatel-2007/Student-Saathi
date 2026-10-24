@@ -3,9 +3,11 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.utils import timezone
 
-from apps.academics.models import Enrollment, Section, Subject, TeachingAssignment
+from apps.academics.models import Department, Enrollment, Section, Subject, TeachingAssignment
 from apps.accounts.models import FacultyProfile, Role, StudentProfile, User
 from apps.assessments.models import Assessment, Mark
+from apps.assignments import rules, uploads
+from apps.assignments.models import Assignment, Submission
 from apps.attendance.models import AttendanceRecord, AttendanceSession
 
 from .conftest import login
@@ -77,3 +79,80 @@ def test_faculty_sees_at_risk_students_in_demo_class(client, seeded):
     at_risk = {r["student"]["roll_no"] for r in summary["at_risk_students"]}
     assert {"CSEA003", "CSEA007", "CSEA012"} <= at_risk
     assert summary["students"] == 15 and sum(b["count"] for b in summary["marks_distribution"]) == 15
+
+
+# ------------------------------------------------------------------ assignments in the demo data
+
+
+def test_seed_demo_creates_assignments_with_a_realistic_mix(seeded):
+
+    assert Assignment.objects.count() == 30  # 3 per class, 10 classes
+    assert Assignment.objects.filter(due_at__gt=timezone.now()).count() == 10  # one upcoming per class
+    assert Assignment.objects.filter(allow_late_submissions=False).count() == 10
+
+    early = on_time_near = late = graded = with_feedback = 0
+    for sub in Submission.objects.select_related("assignment"):
+        offset = rules.offset_seconds(sub.submitted_at, sub.assignment.due_at)
+        early += offset <= -2 * 86400
+        on_time_near += -4 * 3600 <= offset < 0
+        late += offset > 0
+        graded += sub.is_graded
+        with_feedback += bool(sub.is_graded and sub.feedback)
+        assert sub.submitted_at <= timezone.now()
+    assert early and on_time_near and late and graded and with_feedback
+
+    total_possible = sum(15 for _ in Assignment.objects.all())
+    assert 0 < Submission.objects.count() < total_possible  # some students never submitted
+
+    # Strict-deadline assignments only contain on-time work.
+    strict = Submission.objects.filter(assignment__allow_late_submissions=False).select_related("assignment")
+    assert all(rules.timing(s.submitted_at, s.assignment.due_at) == rules.ON_TIME for s in strict)
+
+    sub = Submission.objects.first()
+    data = sub.file.read()
+    assert data.startswith(b"%PDF-") and data.endswith(b"%%EOF\n")
+    assert uploads.validate_upload(
+        name=sub.original_name,
+        size=len(data),
+        content_type="application/pdf",
+        head=data,
+        max_bytes=10 * 1024 * 1024,
+    )
+
+
+def test_demo_students_see_assignment_states_through_the_api(client, seeded):
+    seen = set()
+    for username in ("student01", "student05", "student12", "student20"):
+        for item in call(client, "get", "/students/me/assignments?page_size=100", username).json()["items"]:
+            seen.add(item["status"])
+    assert {"GRADED", "NOT_SUBMITTED"} <= seen
+    assert seen & {"SUBMITTED", "LATE", "OVERDUE_MISSING"}
+
+
+def test_reset_replaces_the_demo_files(media_root, db, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        call_command("seed_demo", verbosity=0)
+    before = {p.name for p in (media_root / "assignments").rglob("*.pdf")}
+    assert before
+
+    with django_capture_on_commit_callbacks(execute=True):
+        call_command("seed_demo", "--reset", verbosity=0)
+    after = {p.name for p in (media_root / "assignments").rglob("*.pdf")}
+    assert len(after) == len(before) and before.isdisjoint(after)  # the old files are gone, new ones written
+
+
+def test_reset_leaves_other_peoples_assignments_alone(media_root, db, seeded):
+
+    keep_subject = Subject.objects.create(code="REAL1", name="Real", credits=1, semester=1)
+    section = Section.objects.create(name="Z", program="Real", semester=1, academic_year="2025-2026")
+    faculty = User.objects.create_user("realfac", password="x", role=Role.FACULTY)
+
+    dept = Department.objects.create(name="Real", code="REAL")
+    profile = FacultyProfile.objects.create(user=faculty, employee_id="REAL1", department=dept)
+    ta = TeachingAssignment.objects.create(faculty=profile, subject=keep_subject, section=section)
+
+    Assignment.objects.create(
+        teaching_assignment=ta, title="Mine", created_by=faculty, due_at=timezone.now(), max_marks=10
+    )
+    call_command("seed_demo", "--reset", verbosity=0)
+    assert Assignment.objects.filter(title="Mine").exists()

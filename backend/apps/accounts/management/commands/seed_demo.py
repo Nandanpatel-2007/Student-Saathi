@@ -9,8 +9,10 @@ department DM-CSE) so --reset never touches other data. All demo passwords are `
 
 import datetime as dt
 import random
+import uuid
 
 from django.contrib.auth.hashers import make_password
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -18,6 +20,7 @@ from django.utils import timezone
 from apps.academics.models import Department, Enrollment, Section, Subject, TeachingAssignment
 from apps.accounts.models import FacultyProfile, Role, StudentProfile, User
 from apps.assessments.models import Assessment, Mark
+from apps.assignments.models import Assignment, Submission
 from apps.attendance.models import AttendanceRecord, AttendanceSession, AttendanceStatus
 
 PASSWORD = "demo1234"
@@ -65,6 +68,18 @@ ASSESSMENTS = [  # title, type, max marks, days after window start
 ]
 WINDOW_DAYS = 41  # ~6 weeks of classes
 
+# title, max marks, days from today the work is (was) due, allows late submissions, graded share
+ASSIGNMENTS = [
+    ("Problem Set 1", 20, -20, True, 1.0),  # long past: everything submitted is graded
+    ("Problem Set 2", 25, -8, False, 0.5),  # strict deadline; about half graded
+    ("Mini Project Proposal", 40, 5, True, 0.0),  # upcoming: a few early birds, nothing graded
+]
+FEEDBACK = {
+    "high": "Excellent work: clear reasoning and well presented.",
+    "mid": "Good effort. Tighten the explanation in the later questions.",
+    "low": "Needs more depth. Please see me during office hours.",
+}
+
 # Deliberately at-risk students (usernames), see _profile().
 LOW_ATTENDANCE = {"student03": 0.45}
 WARNING_ATTENDANCE = {"student18": 0.22}
@@ -98,6 +113,8 @@ class Command(BaseCommand):
     def _wipe(self):
         users = User.objects.filter(username__in=demo_usernames())
         assignments = TeachingAssignment.objects.filter(subject__code__startswith="DM-")
+        # Deleting the assignments cascades to their submissions; a signal removes the stored files.
+        Assignment.objects.filter(teaching_assignment__in=assignments).delete()
         AttendanceSession.objects.filter(teaching_assignment__in=assignments).delete()
         Assessment.objects.filter(teaching_assignment__in=assignments).delete()
         assignments.delete()
@@ -181,11 +198,13 @@ class Command(BaseCommand):
                 rng, assignment, owner, roster, start, today, subject_order[assignment.subject.code]
             )
             self._seed_assessments(rng, assignment, roster, start)
+            self._seed_assignments(assignment, owner, roster)
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Seeded 1 admin, {len(faculty)} faculty, {len(sections)} sections, "
-                f"{len(students)} students, {len(subjects)} subjects, {len(assignments)} classes."
+                f"{len(students)} students, {len(subjects)} subjects, {len(assignments)} classes, "
+                f"{Assignment.objects.count()} assignments with {Submission.objects.count()} submissions."
             )
         )
         self.stdout.write(f"Logins (password '{PASSWORD}'): admin, faculty1-3, student01-30")
@@ -264,3 +283,108 @@ class Command(BaseCommand):
                 obtained = round(pct / 100 * float(assessment.max_marks) * 2) / 2
                 marks.append(Mark(assessment=assessment, student=student, marks_obtained=obtained))
         Mark.objects.bulk_create(marks)
+
+    def _seed_assignments(self, ta, owner, roster):
+        """Three assignments per class with a realistic spread of submission timings and grades."""
+        rng = random.Random(f"assignments-{ta.subject.code}-{ta.section.name}")  # stable across resets
+        now = timezone.now()
+        for title, max_marks, due_offset, allow_late, graded_share in ASSIGNMENTS:
+            due_day = timezone.localdate() + dt.timedelta(days=due_offset)
+            due_at = timezone.make_aware(dt.datetime.combine(due_day, dt.time(17, 0)))
+            work = Assignment.objects.create(
+                teaching_assignment=ta,
+                title=title,
+                description=f"{title} for {ta.subject.name}. Upload a PDF.",
+                created_by=owner,
+                created_at=due_at - dt.timedelta(days=12),
+                due_at=due_at,
+                max_marks=max_marks,
+                allow_late_submissions=allow_late,
+            )
+            upcoming = due_at > now
+            for student in roster:
+                username = student.user.username
+                scenario = self._scenario(rng, username, upcoming, allow_late)
+                if scenario == "missing":
+                    continue
+                submitted_at = self._submitted_at(rng, scenario, due_at, now)
+                submission = Submission(
+                    assignment=work,
+                    student=student,
+                    original_name=f"{username}_{title.lower().replace(' ', '_')}.pdf",
+                    note="" if rng.random() < 0.7 else "Please check question 3.",
+                    submitted_at=submitted_at,
+                )
+                pdf = make_pdf(f"{title} - {username}")
+                submission.size = len(pdf)
+                submission.content_type = "application/pdf"
+                submission.file.save(f"{uuid.uuid4().hex}.pdf", ContentFile(pdf), save=False)
+                if rng.random() < graded_share:
+                    pct = self._assignment_percent(rng, username)
+                    submission.marks_obtained = round(pct / 100 * max_marks * 2) / 2
+                    submission.feedback = FEEDBACK["high" if pct >= 80 else "mid" if pct >= 60 else "low"]
+                    submission.graded_at = min(
+                        now, submitted_at + dt.timedelta(days=1, hours=rng.randint(0, 8))
+                    )
+                    submission.graded_by = owner
+                submission.save()
+
+    @staticmethod
+    def _scenario(rng, username, upcoming, allow_late):
+        if username == "student12":
+            return "early" if upcoming else "ontime"  # keeps this student's sharp-drop story intact
+        roll = rng.random()
+        if upcoming:
+            return "early" if roll < 0.25 else "missing"
+        if roll < 0.25:
+            return "early"
+        if roll < 0.60:
+            return "ontime"
+        if roll < 0.80:
+            return "late" if allow_late else "missing"
+        return "missing"
+
+    @staticmethod
+    def _submitted_at(rng, scenario, due_at, now):
+        if scenario == "early":
+            when = due_at - dt.timedelta(days=2, hours=rng.randint(0, 20), minutes=rng.randint(0, 59))
+        elif scenario == "ontime":
+            when = due_at - dt.timedelta(minutes=rng.randint(5, 240))
+        else:  # late: hours to a few days after
+            when = due_at + dt.timedelta(hours=rng.randint(1, 70), minutes=rng.randint(0, 59))
+        return min(when, now - dt.timedelta(minutes=1))
+
+    @staticmethod
+    def _assignment_percent(rng, username):
+        if username in FAILING or username in LOW_AND_FAILING:
+            ability = 28
+        elif username in SHARP_DROP:
+            ability = 90  # high marks keep the later fall to the final assessment a sharp drop
+        else:
+            ability = rng.uniform(55, 90)
+        return min(max(ability + rng.gauss(0, 6), 5), 100)
+
+
+def make_pdf(text: str) -> bytes:
+    """A tiny but valid single-page PDF, so demo downloads open in any viewer (no binary fixtures)."""
+    safe = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT /F1 12 Tf 20 50 Td ({safe}) Tj ET".encode()
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 100] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref_at = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    return bytes(out)

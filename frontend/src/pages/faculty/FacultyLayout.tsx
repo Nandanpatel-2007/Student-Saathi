@@ -1,4 +1,4 @@
-import { BookOpen, CalendarCheck, ClipboardCheck, LayoutDashboard, Users } from 'lucide-react'
+import { BookOpen, CalendarCheck, ClipboardCheck, FileText, LayoutDashboard, Users } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
 
 import { PortalShell, type PortalNavItem } from '../../components/PortalShell'
@@ -12,6 +12,7 @@ const NAV: readonly PortalNavItem[] = [
   { to: '/faculty', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/faculty/attendance', label: 'Attendance', icon: CalendarCheck },
   { to: '/faculty/assessments', label: 'Assessments', icon: ClipboardCheck },
+  { to: '/faculty/assignments', label: 'Assignments', icon: FileText },
   { to: '/faculty/students', label: 'Students', icon: Users },
   { to: '/faculty/subjects', label: 'Subjects', icon: BookOpen },
 ]

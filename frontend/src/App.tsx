@@ -1,36 +1,36 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { FullPageLoader } from './components/FullPageLoader'
-import { AdminHome } from './pages/AdminHome'
+import { lazyNamed } from './lib/lazy'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { NotFound } from './pages/NotFound'
 
 // The role portals (and the charting library) load only for the users who need them.
-const StudentLayout = lazy(() => import('./pages/student/StudentLayout').then((m) => ({ default: m.StudentLayout })))
-const StudentDashboardPage = lazy(() =>
-  import('./pages/student/DashboardPage').then((m) => ({ default: m.DashboardPage })),
-)
-const StudentAttendancePage = lazy(() =>
-  import('./pages/student/AttendancePage').then((m) => ({ default: m.AttendancePage })),
-)
-const StudentPerformancePage = lazy(() =>
-  import('./pages/student/PerformancePage').then((m) => ({ default: m.PerformancePage })),
-)
-const StudentAlertsPage = lazy(() => import('./pages/student/AlertsPage').then((m) => ({ default: m.AlertsPage })))
+const StudentLayout = lazyNamed(() => import('./pages/student/StudentLayout'), 'StudentLayout')
+const StudentDashboard = lazyNamed(() => import('./pages/student/DashboardPage'), 'DashboardPage')
+const StudentAttendance = lazyNamed(() => import('./pages/student/AttendancePage'), 'AttendancePage')
+const StudentPerformance = lazyNamed(() => import('./pages/student/PerformancePage'), 'PerformancePage')
+const StudentAlerts = lazyNamed(() => import('./pages/student/AlertsPage'), 'AlertsPage')
+const StudentAssignments = lazyNamed(() => import('./pages/student/AssignmentsPage'), 'AssignmentsPage')
 
-const FacultyLayout = lazy(() => import('./pages/faculty/FacultyLayout').then((m) => ({ default: m.FacultyLayout })))
-const DashboardPage = lazy(() => import('./pages/faculty/DashboardPage').then((m) => ({ default: m.DashboardPage })))
-const AttendancePage = lazy(() =>
-  import('./pages/faculty/AttendancePage').then((m) => ({ default: m.AttendancePage })),
-)
-const AssessmentsPage = lazy(() =>
-  import('./pages/faculty/AssessmentsPage').then((m) => ({ default: m.AssessmentsPage })),
-)
-const StudentsPage = lazy(() => import('./pages/faculty/StudentsPage').then((m) => ({ default: m.StudentsPage })))
-const SubjectsPage = lazy(() => import('./pages/faculty/SubjectsPage').then((m) => ({ default: m.SubjectsPage })))
+const FacultyLayout = lazyNamed(() => import('./pages/faculty/FacultyLayout'), 'FacultyLayout')
+const FacultyDashboard = lazyNamed(() => import('./pages/faculty/DashboardPage'), 'DashboardPage')
+const FacultyAttendance = lazyNamed(() => import('./pages/faculty/AttendancePage'), 'AttendancePage')
+const FacultyAssessments = lazyNamed(() => import('./pages/faculty/AssessmentsPage'), 'AssessmentsPage')
+const FacultyAssignments = lazyNamed(() => import('./pages/faculty/AssignmentsPage'), 'AssignmentsPage')
+const FacultyAssignmentDetail = lazyNamed(() => import('./pages/faculty/AssignmentDetailPage'), 'AssignmentDetailPage')
+const FacultyStudents = lazyNamed(() => import('./pages/faculty/StudentsPage'), 'StudentsPage')
+const FacultySubjects = lazyNamed(() => import('./pages/faculty/SubjectsPage'), 'SubjectsPage')
+
+const AdminLayout = lazyNamed(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
+const AdminOverview = lazyNamed(() => import('./pages/admin/OverviewPage'), 'OverviewPage')
+const AdminSubjects = lazyNamed(() => import('./pages/admin/SubjectsPage'), 'SubjectsPage')
+const AdminSections = lazyNamed(() => import('./pages/admin/SectionsPage'), 'SectionsPage')
+const AdminTeaching = lazyNamed(() => import('./pages/admin/TeachingPage'), 'TeachingPage')
+const AdminEnrollments = lazyNamed(() => import('./pages/admin/EnrollmentsPage'), 'EnrollmentsPage')
 
 export default function App() {
   return (
@@ -41,27 +41,37 @@ export default function App() {
 
         <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
           <Route path="/student" element={<StudentLayout />}>
-            <Route index element={<StudentDashboardPage />} />
-            <Route path="attendance" element={<StudentAttendancePage />} />
-            <Route path="performance" element={<StudentPerformancePage />} />
-            <Route path="alerts" element={<StudentAlertsPage />} />
+            <Route index element={<StudentDashboard />} />
+            <Route path="attendance" element={<StudentAttendance />} />
+            <Route path="performance" element={<StudentPerformance />} />
+            <Route path="alerts" element={<StudentAlerts />} />
+            <Route path="assignments" element={<StudentAssignments />} />
             <Route path="*" element={<Navigate to="/student" replace />} />
           </Route>
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['FACULTY']} />}>
           <Route path="/faculty" element={<FacultyLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="attendance" element={<AttendancePage />} />
-            <Route path="assessments" element={<AssessmentsPage />} />
-            <Route path="students" element={<StudentsPage />} />
-            <Route path="subjects" element={<SubjectsPage />} />
+            <Route index element={<FacultyDashboard />} />
+            <Route path="attendance" element={<FacultyAttendance />} />
+            <Route path="assessments" element={<FacultyAssessments />} />
+            <Route path="assignments" element={<FacultyAssignments />} />
+            <Route path="assignments/:assignmentId" element={<FacultyAssignmentDetail />} />
+            <Route path="students" element={<FacultyStudents />} />
+            <Route path="subjects" element={<FacultySubjects />} />
             <Route path="*" element={<Navigate to="/faculty" replace />} />
           </Route>
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route path="/admin/*" element={<AdminHome />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverview />} />
+            <Route path="subjects" element={<AdminSubjects />} />
+            <Route path="sections" element={<AdminSections />} />
+            <Route path="teaching" element={<AdminTeaching />} />
+            <Route path="enrollments" element={<AdminEnrollments />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<NotFound />} />

@@ -21,6 +21,7 @@ function summary(over: Partial<ClassSummary>): ClassSummary {
     section,
     students: 0,
     sessions_held: 5,
+    submissions_to_grade: 0,
     attendance_pct: null,
     average_score_pct: null,
     marks_distribution: buckets(new Array(10).fill(0)),
@@ -30,6 +31,7 @@ function summary(over: Partial<ClassSummary>): ClassSummary {
 }
 
 const a = summary({
+  submissions_to_grade: 4,
   students: 30,
   attendance_pct: 90,
   average_score_pct: 70,
@@ -37,6 +39,7 @@ const a = summary({
   at_risk_students: [risk(1), risk(2)],
 })
 const b = summary({
+  submissions_to_grade: 3,
   assignment_id: 2,
   students: 10,
   attendance_pct: 50,
@@ -52,6 +55,11 @@ describe('aggregateSummaries', () => {
     expect(t.students).toBe(40)
     expect(t.attendancePct).toBe(80) // (90*30 + 50*10) / 40
     expect(t.averageScore).toBe(65) // (70*30 + 50*10) / 40
+  })
+
+  it('adds up submissions waiting for marks', () => {
+    expect(aggregateSummaries([a, b]).submissionsToGrade).toBe(7)
+    expect(aggregateSummaries([]).submissionsToGrade).toBe(0)
   })
 
   it('counts a student at risk in two classes once', () => {

@@ -88,6 +88,8 @@ class MarkEntry:
     max_marks: float
     marks_obtained: float | None = None
     is_absent: bool = False
+    #: "assessment" or "assignment": item ids are only unique within one kind.
+    kind: str = "assessment"
 
     @property
     def is_graded(self) -> bool:
@@ -200,7 +202,7 @@ def detect_sharp_drop(entries: Sequence[MarkEntry], cfg: AnalyticsConfig) -> tup
     """
     sat = sorted(
         (e for e in entries if not e.is_absent and e.percent is not None),
-        key=lambda e: (e.date, e.item_id),
+        key=lambda e: (e.date, e.kind, e.item_id),
     )
     if len(sat) < 2:
         return None

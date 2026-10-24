@@ -10,6 +10,8 @@ export interface FacultyTotals {
   averageScore: number | null
   /** Distinct students flagged at risk in at least one class. */
   atRiskStudents: number
+  /** Submitted assignments, across all classes, that still have no marks. */
+  submissionsToGrade: number
   /** Marks distribution buckets summed across classes. */
   distribution: HistogramBucket[]
 }
@@ -47,6 +49,7 @@ export function aggregateSummaries(summaries: readonly ClassSummary[]): FacultyT
     attendancePct: sizeScaledMean(summaries.map((s) => ({ value: s.attendance_pct, weight: s.students }))),
     averageScore: sizeScaledMean(summaries.map((s) => ({ value: s.average_score_pct, weight: s.students }))),
     atRiskStudents: atRisk.size,
+    submissionsToGrade: summaries.reduce((sum, s) => sum + s.submissions_to_grade, 0),
     distribution: [...buckets.values()].sort((a, b) => a.min - b.min),
   }
 }

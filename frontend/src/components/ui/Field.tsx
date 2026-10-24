@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
+import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from 'react'
 
 import { cn } from '../../lib/cn'
 
@@ -43,6 +43,25 @@ export function Input({ invalid, className, ...rest }: InputProps) {
       aria-invalid={invalid ? true : undefined}
       className={cn(
         'block h-10 w-full rounded-lg border bg-canvas px-3 text-sm text-ink placeholder:text-muted/70 disabled:cursor-not-allowed disabled:opacity-60',
+        invalid ? 'border-danger-ink' : 'border-line',
+        className,
+      )}
+      {...rest}
+    />
+  )
+}
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  invalid?: boolean
+  ref?: Ref<HTMLTextAreaElement>
+}
+
+export function Textarea({ invalid, className, ...rest }: TextareaProps) {
+  return (
+    <textarea
+      aria-invalid={invalid ? true : undefined}
+      className={cn(
+        'block min-h-24 w-full rounded-lg border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-muted/70 disabled:cursor-not-allowed disabled:opacity-60',
         invalid ? 'border-danger-ink' : 'border-line',
         className,
       )}

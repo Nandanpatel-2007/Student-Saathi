@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarCheck, GraduationCap, Users } from 'lucide-react'
+import { AlertTriangle, CalendarCheck, FileText, GraduationCap, Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -63,7 +63,7 @@ export function DashboardPage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard
               title="Students"
               value={String(totals?.students ?? 0)}
@@ -90,6 +90,13 @@ export function DashboardPage() {
               value={String(totals?.atRiskStudents ?? 0)}
               caption="Flagged in at least one class"
               icon={AlertTriangle}
+              loading={statsLoading}
+            />
+            <StatCard
+              title="Submissions to grade"
+              value={String(totals?.submissionsToGrade ?? 0)}
+              caption="Assignments waiting for marks"
+              icon={FileText}
               loading={statsLoading}
             />
           </div>

@@ -74,3 +74,10 @@ def call(client, method, path, user=None, body=None):
 def fast_password_hasher(settings):
     """PBKDF2 is deliberately slow; tests log in constantly."""
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture(autouse=True)
+def media_root(settings, tmp_path):
+    """Uploaded files go to a throwaway folder, never into the real backend/media."""
+    settings.MEDIA_ROOT = tmp_path / "media"
+    return settings.MEDIA_ROOT

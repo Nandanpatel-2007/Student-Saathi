@@ -7,11 +7,14 @@ from dataclasses import dataclass
 
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
+from django.utils import timezone
 from ninja.errors import HttpError
 
+from api.csvutil import safe_cell
 from apps.academics.models import Subject, TeachingAssignment
 from apps.accounts.models import Role, StudentProfile, User
 from apps.assessments.models import Assessment, Mark
+from apps.assignments.models import Assignment, Submission
 from apps.attendance.models import AttendanceRecord, AttendanceSession
 
 from . import services as svc
@@ -53,6 +56,29 @@ def _entries_by_student(rows) -> dict[int, list[svc.MarkEntry]]:
             )
         )
     return result
+
+
+SUBMISSION_FIELDS = (
+    "student_id",
+    "assignment_id",
+    "assignment__due_at",
+    "assignment__max_marks",
+    "marks_obtained",
+)
+
+
+def _add_graded_assignments(entries: dict[int, list[svc.MarkEntry]], rows) -> None:
+    """Graded submissions count as graded items, dated by their assignment's due date (project time zone)."""
+    for row in rows:
+        entries[row["student_id"]].append(
+            svc.MarkEntry(
+                item_id=row["assignment_id"],
+                date=timezone.localtime(row["assignment__due_at"]).date(),
+                max_marks=float(row["assignment__max_marks"]),
+                marks_obtained=float(row["marks_obtained"]),
+                kind="assignment",
+            )
+        )
 
 
 def _counts_by_key(rows, key: str) -> dict:
@@ -119,11 +145,17 @@ def student_dashboard(user: User) -> dict:
     per_subject: dict[int, list[dict]] = defaultdict(list)
     for row in mark_rows:
         per_subject[assignment_subject[row["assessment__teaching_assignment_id"]]].append(row)
+    graded_assignment_rows: dict[int, list[dict]] = defaultdict(list)
+    for row in Submission.objects.filter(
+        assignment__teaching_assignment_id__in=assignment_subject, marks_obtained__isnull=False
+    ).values(*SUBMISSION_FIELDS, "assignment__teaching_assignment_id"):
+        graded_assignment_rows[assignment_subject[row["assignment__teaching_assignment_id"]]].append(row)
 
     subject_payloads, all_alerts = [], []
     overall = svc.AttendanceCounts()
     for subject in subjects:
         entries_by_student = _entries_by_student(per_subject[subject.id])
+        _add_graded_assignments(entries_by_student, graded_assignment_rows[subject.id])
         class_scores = [svc.average_score(entries) for entries in entries_by_student.values()]
         counts = own_counts.get(subject.id, svc.AttendanceCounts())
         metrics = svc.subject_metrics(counts, entries_by_student.get(student.id, []), cfg)
@@ -175,6 +207,7 @@ class ClassData:
     rows: list[StudentRow]
     sessions_held: int
     entries: dict[int, list[svc.MarkEntry]]
+    submissions_to_grade: int
     class_attendance_pct: float | None
     class_score_pct: float | None
     cfg: svc.AnalyticsConfig
@@ -207,6 +240,15 @@ def load_class(user: User, assignment_id: int) -> ClassData:
     entries = _entries_by_student(
         Mark.objects.filter(assessment__teaching_assignment=assignment).values(*MARK_FIELDS)
     )
+    _add_graded_assignments(
+        entries,
+        Submission.objects.filter(
+            assignment__teaching_assignment=assignment, marks_obtained__isnull=False
+        ).values(*SUBMISSION_FIELDS),
+    )
+    submissions_to_grade = Submission.objects.filter(
+        assignment__teaching_assignment=assignment, marks_obtained__isnull=True
+    ).count()
     sessions_held = AttendanceSession.objects.filter(teaching_assignment=assignment).count()
 
     metrics = {
@@ -224,7 +266,9 @@ def load_class(user: User, assignment_id: int) -> ClassData:
         )
         for s in roster
     ]
-    return ClassData(assignment, rows, sessions_held, entries, class_attendance, class_score, cfg)
+    return ClassData(
+        assignment, rows, sessions_held, entries, submissions_to_grade, class_attendance, class_score, cfg
+    )
 
 
 def class_summary(user: User, assignment_id: int) -> dict:
@@ -240,6 +284,7 @@ def class_summary(user: User, assignment_id: int) -> dict:
         "section": data.assignment.section,
         "students": len(data.rows),
         "sessions_held": data.sessions_held,
+        "submissions_to_grade": data.submissions_to_grade,
         "attendance_pct": _r(data.class_attendance_pct),
         "average_score_pct": _r(data.class_score_pct),
         "marks_distribution": svc.histogram(scores),
@@ -280,20 +325,13 @@ def class_students(user: User, assignment_id: int) -> list[dict]:
 _STATUS_LETTER = {"PRESENT": "P", "ABSENT": "A", "LATE": "L", "EXCUSED": "E"}
 
 
-def _safe(cell):
-    """Neutralise spreadsheet formula injection in user-supplied text."""
-    if isinstance(cell, str) and cell[:1] in ("=", "+", "-", "@", "\t", "\r"):
-        return "'" + cell
-    return cell
-
-
 def export_class_csv(user: User, assignment_id: int, kind: str) -> tuple[str, str]:
     data = load_class(user, assignment_id)
     out = io.StringIO()
     writer = csv.writer(out)
 
     def write(row):
-        writer.writerow([_safe(c) for c in row])
+        writer.writerow([safe_cell(c) for c in row])
 
     base = ["Roll No", "Name"]
     if kind == "attendance":
@@ -331,16 +369,19 @@ def export_class_csv(user: User, assignment_id: int, kind: str) -> tuple[str, st
         assessments = list(
             Assessment.objects.filter(teaching_assignment=data.assignment).order_by("date", "id")
         )
-        write(
-            base
-            + [f"{a.title} (/{float(a.max_marks):g})" for a in assessments]
-            + ["Average score %", "Diff vs class (pts)"]
+        assignments = list(
+            Assignment.objects.filter(teaching_assignment=data.assignment).order_by("due_at", "id")
         )
+        # (kind, id, column title); assignments show only once graded, like pending assessments.
+        columns = [("assessment", a.id, f"{a.title} (/{float(a.max_marks):g})") for a in assessments] + [
+            ("assignment", a.id, f"{a.title} (/{float(a.max_marks):g}, assignment)") for a in assignments
+        ]
+        write(base + [title for _, _, title in columns] + ["Average score %", "Diff vs class (pts)"])
         for row in data.rows:
-            by_assessment = {e.item_id: e for e in data.entries.get(row.student.id, [])}
+            by_item = {(e.kind, e.item_id): e for e in data.entries.get(row.student.id, [])}
             cells = []
-            for a in assessments:
-                entry = by_assessment.get(a.id)
+            for item_kind, item_id, _title in columns:
+                entry = by_item.get((item_kind, item_id))
                 if entry is None or not entry.is_graded:
                     cells.append("")
                 elif entry.is_absent:

@@ -108,12 +108,19 @@ def delete_subject(subject_id: int) -> None:
 # ---------------------------------------------------------------- sections
 
 
-def list_sections(user: User, semester: int | None = None, academic_year: str | None = None):
+def list_sections(
+    user: User,
+    semester: int | None = None,
+    academic_year: str | None = None,
+    search: str | None = None,
+):
     qs = sections_for(user)
     if semester is not None:
         qs = qs.filter(semester=semester)
     if academic_year:
         qs = qs.filter(academic_year=academic_year)
+    if search:
+        qs = qs.filter(Q(name__icontains=search) | Q(program__icontains=search))
     return qs
 
 

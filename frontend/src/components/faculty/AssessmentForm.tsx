@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-import { ApiError } from '../../lib/api'
 import {
   ASSESSMENT_TYPES,
   createAssessment,
@@ -11,7 +10,8 @@ import {
   type Assessment,
   type AssessmentInput,
 } from '../../lib/faculty-api'
-import { errorMessage, todayISO } from '../../lib/format'
+import { applyApiFieldErrors } from '../../lib/forms'
+import { todayISO } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Card, CardHeader } from '../ui/Card'
 import { Field, Input } from '../ui/Field'
@@ -40,7 +40,7 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
-const FIELDS: ReadonlyArray<keyof FormValues> = ['title', 'type', 'max_marks', 'date']
+const FIELDS = ['title', 'type', 'max_marks', 'date'] as const
 
 interface Props {
   assignmentId: number
@@ -83,19 +83,8 @@ export function AssessmentForm({ assignmentId, assessment, onSaved, onCancel }: 
         : await createAssessment(assignmentId, input)
       onSaved(saved)
     } catch (error) {
-      // Show API validation messages next to the field they belong to.
-      let placed = false
-      if (error instanceof ApiError) {
-        for (const detail of error.details) {
-          const name = detail.field?.split('.').pop()
-          const field = FIELDS.find((f) => f === name)
-          if (field) {
-            setError(field, { message: detail.message })
-            placed = true
-          }
-        }
-      }
-      if (!placed) setNotice({ tone: 'error', text: errorMessage(error) })
+      const leftover = applyApiFieldErrors<FormValues>(error, FIELDS, setError)
+      if (leftover) setNotice({ tone: 'error', text: leftover })
     }
   })
 

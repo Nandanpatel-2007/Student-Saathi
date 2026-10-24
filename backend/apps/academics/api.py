@@ -102,6 +102,7 @@ sections_router = Router(tags=["Sections"])
 class SectionFilters(Schema):
     semester: int | None = None
     academic_year: str | None = None
+    search: str | None = None
 
 
 @sections_router.get(
@@ -113,7 +114,7 @@ class SectionFilters(Schema):
 )
 @paginate(StandardPagination)
 def list_sections(request, filters: Query[SectionFilters]):
-    return services.list_sections(request.user, filters.semester, filters.academic_year)
+    return services.list_sections(request.user, filters.semester, filters.academic_year, filters.search)
 
 
 @sections_router.get(

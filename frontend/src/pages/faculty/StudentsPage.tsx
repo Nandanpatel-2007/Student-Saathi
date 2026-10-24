@@ -1,15 +1,14 @@
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { ClassPicker } from '../../components/faculty/ClassPicker'
 import { DataTable, type Column } from '../../components/faculty/DataTable'
 import { ExportButtons } from '../../components/faculty/ExportButtons'
 import { PageTitle } from '../../components/faculty/PageTitle'
 import { AlertChips } from '../../components/faculty/StatusBadge'
-import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { DiffIndicator } from '../../components/ui/DiffIndicator'
-import { Input } from '../../components/ui/Field'
+import { Pagination } from '../../components/ui/Pagination'
+import { SearchField } from '../../components/ui/SearchField'
 import { EmptyState, ErrorState, LoadingBlock } from '../../components/ui/States'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { useSelectedClass } from '../../hooks/useSelectedClass'
@@ -39,7 +38,6 @@ function classesNeeded(value: number | null): string {
 
 export function StudentsPage() {
   const { classes, selected, value, setClass } = useSelectedClass({ allowAll: false })
-  const searchId = useId()
   const [query, setQuery] = useState('')
   // The page number belongs to one class; switching class starts again from page 1.
   const [paging, setPaging] = useState({ classId: -1, page: 1 })
@@ -122,22 +120,7 @@ export function StudentsPage() {
       <Card>
         <div className="grid gap-4 p-5 sm:grid-cols-2">
           <ClassPicker classes={classes} value={value} onChange={setClass} />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={searchId} className="text-sm font-medium text-ink">
-              Search this page
-            </label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-              <Input
-                id={searchId}
-                type="search"
-                value={query}
-                placeholder="Name or roll number"
-                className="pl-9"
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-          </div>
+          <SearchField label="Search this page" value={query} onChange={setQuery} placeholder="Name or roll number" />
         </div>
 
         {students.error ? (
@@ -153,21 +136,14 @@ export function StudentsPage() {
         )}
 
         {data && data.count > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
-            <p className="text-sm text-muted" aria-live="polite">
-              Page {data.page} of {Math.max(data.total_pages, 1)} · {data.count} student{data.count === 1 ? '' : 's'}
-            </p>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => goTo(page - 1)} disabled={page <= 1 || students.loading}>
-                <ChevronLeft className="size-4" aria-hidden="true" />
-                Previous
-              </Button>
-              <Button size="sm" onClick={() => goTo(page + 1)} disabled={page >= data.total_pages || students.loading}>
-                Next
-                <ChevronRight className="size-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={data.page}
+            totalPages={data.total_pages}
+            count={data.count}
+            noun="student"
+            busy={students.refreshing}
+            onPage={goTo}
+          />
         )}
       </Card>
     </div>

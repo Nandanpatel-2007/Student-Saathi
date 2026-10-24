@@ -2,6 +2,7 @@ import { RefreshCw, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../auth/useAuth'
+import { AssignmentsWidget } from '../../components/assignments/AssignmentsWidget'
 import { PageTitle } from '../../components/faculty/PageTitle'
 import { AlertList } from '../../components/student/AlertList'
 import { AttendanceRing } from '../../components/student/AttendanceRing'
@@ -11,7 +12,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/States'
 import { useStudentContext } from '../../hooks/useStudentContext'
-import { formatPercent } from '../../lib/format'
+import { formatLongDate, formatPercent } from '../../lib/format'
 import { computeTotals, greeting } from '../../lib/student-derive'
 
 const ALERTS_SHOWN = 4
@@ -22,12 +23,7 @@ export function DashboardPage() {
   const totals = computeTotals(data.subjects)
   const criticalCount = data.alerts.filter((a) => a.severity === 'critical').length
   const firstName = user?.name.split(/\s+/)[0]
-  const today = new Date().toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const today = formatLongDate()
 
   return (
     <div className="space-y-6">
@@ -121,6 +117,8 @@ export function DashboardPage() {
           </ul>
         </section>
       </div>
+
+      <AssignmentsWidget />
     </div>
   )
 }

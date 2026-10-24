@@ -86,13 +86,14 @@ interface RequestOptions {
 
 async function send(path: string, method: Method, body: unknown, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // FormData: the browser sets the multipart header (with its boundary) itself.
+  if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, 'network_error', 'Can’t reach the server. Check your connection and that the backend is running.')

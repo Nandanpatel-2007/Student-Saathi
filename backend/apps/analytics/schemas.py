@@ -68,6 +68,7 @@ class ClassSummaryOut(Schema):
     section: SectionOut
     students: int
     sessions_held: int
+    submissions_to_grade: int = Field(0, description="Submitted assignments that have no marks yet")
     attendance_pct: float | None = Field(None, description="Class average of the students' attendance %")
     average_score_pct: float | None = Field(
         None, description="Class average of the students' average score %"
