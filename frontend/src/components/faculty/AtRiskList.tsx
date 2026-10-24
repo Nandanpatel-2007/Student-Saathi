@@ -17,7 +17,7 @@ export function AtRiskList({ items }: { items: readonly AtRiskItem[] }) {
               {item.student.name} <span className="font-normal text-muted">· {item.student.roll_no}</span>
             </p>
             <p className="text-sm text-muted">
-              Attendance {formatPercent(item.attendance_pct)} · Score {formatPercent(item.weighted_score)}
+              Attendance {formatPercent(item.attendance_pct)} · Avg marks {formatPercent(item.average_score_pct)}
             </p>
           </div>
           {item.classLabel && <p className="mt-0.5 text-sm text-muted">{item.classLabel}</p>}

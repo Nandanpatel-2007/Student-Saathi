@@ -53,42 +53,28 @@ export function classesNeededText(needed: number | null): string | null {
   return `Attend ${needed} more ${needed === 1 ? 'class' : 'classes'} in a row to reach the threshold.`
 }
 
-/** 73.3 -> "73rd". */
-export function ordinal(value: number): string {
-  const n = Math.round(value)
-  const mod100 = n % 100
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`
-  switch (n % 10) {
-    case 1:
-      return `${n}st`
-    case 2:
-      return `${n}nd`
-    case 3:
-      return `${n}rd`
-    default:
-      return `${n}th`
-  }
-}
-
 export interface StudentTotals {
   held: number
   present: number
   absent: number
   late: number
   excused: number
-  /** Mean weighted score over subjects that have one; null if none graded. */
-  averageScore: number | null
+  /** The subject with the highest average score, if anything is graded. */
   best: SubjectStats | null
-  /** Graded subjects scoring below their class average. */
-  belowClassAverage: number
+  /** Subjects where the student's average score is below the class average. */
+  belowClassScore: number
+  /** Subjects where the student's attendance is below the class average. */
+  belowClassAttendance: number
   subjectsWithAttendanceAlert: number
   subjectsWithScoreAlert: number
 }
 
 export function computeTotals(subjects: readonly SubjectStats[]): StudentTotals {
-  const graded = subjects.filter((s): s is SubjectStats & { weighted_score: number } => s.weighted_score !== null)
+  const graded = subjects.filter(
+    (s): s is SubjectStats & { average_score_pct: number } => s.average_score_pct !== null,
+  )
   const best = graded.reduce<SubjectStats | null>(
-    (top, s) => (top === null || (top.weighted_score ?? -1) < s.weighted_score ? s : top),
+    (top, s) => (top === null || (top.average_score_pct ?? -1) < s.average_score_pct ? s : top),
     null,
   )
   const hasAlert = (s: SubjectStats, codes: readonly Alert['code'][]) => s.alerts.some((a) => codes.includes(a.code))
@@ -98,9 +84,12 @@ export function computeTotals(subjects: readonly SubjectStats[]): StudentTotals 
     absent: subjects.reduce((sum, s) => sum + s.absent, 0),
     late: subjects.reduce((sum, s) => sum + s.late, 0),
     excused: subjects.reduce((sum, s) => sum + s.excused, 0),
-    averageScore: graded.length ? graded.reduce((sum, s) => sum + s.weighted_score, 0) / graded.length : null,
     best,
-    belowClassAverage: graded.filter((s) => s.class_avg !== null && s.weighted_score < s.class_avg).length,
+    belowClassScore: graded.filter((s) => s.class_avg_score_pct !== null && s.average_score_pct < s.class_avg_score_pct)
+      .length,
+    belowClassAttendance: subjects.filter(
+      (s) => s.attendance_pct !== null && s.class_avg_attendance_pct !== null && s.attendance_pct < s.class_avg_attendance_pct,
+    ).length,
     subjectsWithAttendanceAlert: subjects.filter((s) => hasAlert(s, ATTENDANCE_ALERT_CODES)).length,
     subjectsWithScoreAlert: subjects.filter((s) => hasAlert(s, SCORE_ALERT_CODES)).length,
   }

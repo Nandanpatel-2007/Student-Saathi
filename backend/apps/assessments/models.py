@@ -17,7 +17,6 @@ class Assessment(models.Model):
     title = models.CharField(max_length=150)
     type = models.CharField(max_length=12, choices=AssessmentType.choices, default=AssessmentType.OTHER)
     max_marks = models.DecimalField(max_digits=6, decimal_places=2)
-    weightage_percent = models.DecimalField(max_digits=5, decimal_places=2)
     date = models.DateField()
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -25,10 +24,6 @@ class Assessment(models.Model):
         ordering = ["date", "id"]
         constraints = [
             models.CheckConstraint(condition=models.Q(max_marks__gt=0), name="assessment_max_marks_positive"),
-            models.CheckConstraint(
-                condition=models.Q(weightage_percent__gte=0, weightage_percent__lte=100),
-                name="assessment_weightage_0_100",
-            ),
         ]
         indexes = [models.Index(fields=["teaching_assignment", "date"], name="assess_assignment_date_idx")]
 

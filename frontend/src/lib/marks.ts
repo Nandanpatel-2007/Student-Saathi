@@ -55,10 +55,3 @@ export function computeMarkStats(rows: readonly MarkRowInput[], maxMarks: number
   }
 }
 
-/** Sum of weightage already allocated, optionally leaving one assessment out (when editing it). */
-export function weightageUsed(
-  assessments: ReadonlyArray<{ id: number; weightage_percent: number }>,
-  excludeId?: number,
-): number {
-  return assessments.reduce((sum, a) => (a.id === excludeId ? sum : sum + a.weightage_percent), 0)
-}

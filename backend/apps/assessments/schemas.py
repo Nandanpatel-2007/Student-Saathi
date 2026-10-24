@@ -9,10 +9,9 @@ from .models import AssessmentType
 
 
 class AssessmentFields(Schema):
-    title: str = Field(..., max_length=150)
+    title: str = Field(..., min_length=1, max_length=150)
     type: AssessmentType
     max_marks: Decimal = Field(..., gt=0, max_digits=6, decimal_places=2)
-    weightage_percent: Decimal = Field(..., ge=0, le=100, max_digits=5, decimal_places=2)
     date: dt.date
 
 
@@ -32,7 +31,6 @@ class AssessmentOut(Schema):
     title: str
     type: AssessmentType
     max_marks: float
-    weightage_percent: float
     date: dt.date
 
     @staticmethod

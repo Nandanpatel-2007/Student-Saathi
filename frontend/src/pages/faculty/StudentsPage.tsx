@@ -8,14 +8,28 @@ import { PageTitle } from '../../components/faculty/PageTitle'
 import { AlertChips } from '../../components/faculty/StatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
+import { DiffIndicator } from '../../components/ui/DiffIndicator'
 import { Input } from '../../components/ui/Field'
 import { EmptyState, ErrorState, LoadingBlock } from '../../components/ui/States'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { useSelectedClass } from '../../hooks/useSelectedClass'
-import { listClassStudents, type ClassStudent } from '../../lib/faculty-api'
-import { errorMessage, formatNumber, formatPercent } from '../../lib/format'
+import { compareDiff } from '../../lib/compare'
+import { getClassSummary, listClassStudents, type ClassStudent } from '../../lib/faculty-api'
+import { errorMessage, formatPercent } from '../../lib/format'
 
 const PAGE_SIZE = 20
+
+/** Column title with the class average underneath, e.g. "Attendance / Class avg 76%". */
+function ColumnTitle({ title, classAvg, align }: { title: string; classAvg: number | null | undefined; align?: 'right' }) {
+  return (
+    <span className={align === 'right' ? 'block text-right' : 'block'}>
+      {title}
+      <span className="block text-xs font-normal tracking-normal text-muted normal-case">
+        Class avg {classAvg === undefined ? '…' : classAvg === null ? 'No data yet' : formatPercent(classAvg)}
+      </span>
+    </span>
+  )
+}
 
 function classesNeeded(value: number | null): string {
   if (value === null) return '—'
@@ -36,6 +50,9 @@ export function StudentsPage() {
     listClassStudents(classId, { page, pageSize: PAGE_SIZE }),
   )
 
+  // Class averages for the column headers (the per-student rows only carry the differences).
+  const summary = useAsyncData(selected ? `students-summary:${classId}` : null, () => getClassSummary(classId))
+
   const rows = useMemo(() => {
     const items = students.data?.items ?? []
     const needle = query.trim().toLowerCase()
@@ -49,40 +66,44 @@ export function StudentsPage() {
     { key: 'name', header: 'Student', cell: (r) => <span className="font-medium">{r.student.name}</span> },
     {
       key: 'attendance',
-      header: 'Attendance',
-      cell: (r) => (
-        <>
-          <span className="font-medium tabular-nums">{formatPercent(r.attendance_pct)}</span>
-          <span className="block text-xs whitespace-nowrap text-muted tabular-nums">
-            {r.present}P · {r.absent}A · {r.late}L · {r.excused}E
-          </span>
-        </>
-      ),
+      header: <ColumnTitle title="Attendance" classAvg={summary.data?.attendance_pct} />,
+      cell: (r) =>
+        r.attendance_pct === null ? (
+          <span className="text-muted">No data yet</span>
+        ) : (
+          <>
+            <span className="font-medium tabular-nums">{formatPercent(r.attendance_pct)}</span>
+            <span className="block text-xs whitespace-nowrap text-muted tabular-nums">
+              {r.present}P · {r.absent}A · {r.late}L · {r.excused}E
+            </span>
+          </>
+        ),
+    },
+    {
+      key: 'attendanceDiff',
+      header: 'vs class',
+      cell: (r) => <DiffIndicator comparison={compareDiff(r.diff_from_class_attendance)} />,
+    },
+    {
+      key: 'score',
+      header: <ColumnTitle title="Avg marks" classAvg={summary.data?.average_score_pct} align="right" />,
+      align: 'right',
+      cell: (r) =>
+        r.average_score_pct === null ? (
+          <span className="text-muted">No data yet</span>
+        ) : (
+          <span className="font-medium tabular-nums">{formatPercent(r.average_score_pct)}</span>
+        ),
+    },
+    {
+      key: 'scoreDiff',
+      header: 'vs class',
+      cell: (r) => <DiffIndicator comparison={compareDiff(r.diff_from_class_score)} />,
     },
     {
       key: 'needed',
       header: 'Classes needed',
       cell: (r) => <span className="whitespace-nowrap">{classesNeeded(r.classes_needed_for_threshold)}</span>,
-    },
-    {
-      key: 'score',
-      header: 'Weighted score',
-      align: 'right',
-      cell: (r) => <span className="tabular-nums">{formatPercent(r.weighted_score)}</span>,
-    },
-    {
-      key: 'rank',
-      header: 'Rank',
-      align: 'right',
-      cell: (r) =>
-        r.rank === null ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="tabular-nums">
-            #{r.rank}
-            {r.percentile !== null && <span className="block text-xs text-muted">{formatNumber(r.percentile, 0)}th pct</span>}
-          </span>
-        ),
     },
     { key: 'alerts', header: 'Alerts', cell: (r) => <AlertChips alerts={r.alerts} /> },
   ]
@@ -94,7 +115,7 @@ export function StudentsPage() {
     <div className="space-y-6">
       <PageTitle
         title="Students"
-        subtitle="Attendance, scores and alerts for each student in a class."
+        subtitle="Each student’s attendance and average marks, compared with the class average."
         action={selected ? <ExportButtons cls={selected} /> : undefined}
       />
 

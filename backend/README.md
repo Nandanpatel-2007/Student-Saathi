@@ -55,7 +55,7 @@ Analytics rules are configurable (all optional):
 | `ATTENDANCE_WARNING_UPPER_PERCENT` | `80` | `[threshold, this)` raises `ATTENDANCE_WARNING` |
 | `ATTENDANCE_LATE_COUNTS_AS_PRESENT` | `True` | `False` treats LATE as absent |
 | `ATTENDANCE_EXCUSED_POLICY` | `EXCLUDE` | `EXCLUDE` (out of the denominator), `PRESENT` or `ABSENT` |
-| `PASS_MARK_PERCENT` | `40` | Weighted score below this: `FAILING_SUBJECT` |
+| `PASS_MARK_PERCENT` | `40` | Average score below this: `FAILING_SUBJECT` |
 | `SHARP_DROP_POINTS` | `15` | Drop between the last two assessments (strictly greater) |
 
 ## Demo data
@@ -82,8 +82,16 @@ At-risk students: `student03` (low attendance), `student18` (attendance warning)
 Business rules worth knowing:
 
 - Attendance %: `LATE` counts as present; `EXCUSED` is excluded from the denominator (both configurable).
-- Weighted score: only graded assessments count (pending ones are ignored, an absence scores 0), normalised by the
-  weightage graded so far. Total weightage per teaching assignment (a subject taught to a section) is capped at 100.
+- **Average score** (`average_score_pct`) = the mean of `marks_obtained / max_marks * 100` over the student's graded
+  items in that subject and section. Every item counts equally (there is no weightage). Items not graded yet are
+  ignored; an item the student was absent for counts as 0; nothing graded means `null`.
+- **Class averages** are the mean of the students' own values, ignoring `null`s: `class_avg_score_pct` for marks and
+  `class_avg_attendance_pct` for attendance. Students only ever receive these aggregates, never other students' data.
+  Faculty rows carry `diff_from_class_attendance` / `diff_from_class_score` (percentage points, `+` = above average).
+- There is no rank or percentile. The student dashboard also returns `average_score_overall` (the mean of the
+  subject averages that exist).
+- Alerts: `FAILING_SUBJECT` when the average score is below `PASS_MARK_PERCENT`; `SHARP_DROP` when the latest of the
+  last two graded items fell by strictly more than `SHARP_DROP_POINTS` (absences are skipped, items ordered by date).
 - Alerts are computed on every read; there is no background job.
 - `student_id` / `faculty_id` in request bodies are profile ids (`StudentProfile`, `FacultyProfile`).
 

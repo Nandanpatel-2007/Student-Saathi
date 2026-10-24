@@ -11,7 +11,7 @@ import {
   type Assessment,
   type AssessmentInput,
 } from '../../lib/faculty-api'
-import { errorMessage, formatNumber, todayISO } from '../../lib/format'
+import { errorMessage, todayISO } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Card, CardHeader } from '../ui/Card'
 import { Field, Input } from '../ui/Field'
@@ -36,31 +36,22 @@ const schema = z.object({
     .min(1, 'Enter the maximum marks.')
     .refine((v) => Number(v) > 0, 'Must be greater than 0.')
     .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), 'Use at most 2 decimal places.'),
-  weightage_percent: z
-    .string()
-    .trim()
-    .min(1, 'Enter the weightage.')
-    .refine((v) => Number(v) >= 0 && Number(v) <= 100, 'Must be between 0 and 100.')
-    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), 'Use at most 2 decimal places.'),
   date: z.string().min(1, 'Pick a date.'),
 })
 
 type FormValues = z.infer<typeof schema>
-const FIELDS: ReadonlyArray<keyof FormValues> = ['title', 'type', 'max_marks', 'weightage_percent', 'date']
+const FIELDS: ReadonlyArray<keyof FormValues> = ['title', 'type', 'max_marks', 'date']
 
 interface Props {
   assignmentId: number
   /** Present when editing. */
   assessment?: Assessment
-  /** Weightage already used by the class's other assessments. */
-  usedElsewhere: number
   onSaved: (assessment: Assessment) => void
   onCancel: () => void
 }
 
-export function AssessmentForm({ assignmentId, assessment, usedElsewhere, onSaved, onCancel }: Props) {
+export function AssessmentForm({ assignmentId, assessment, onSaved, onCancel }: Props) {
   const [notice, setNotice] = useState<Notice | null>(null)
-  const remaining = Math.max(0, 100 - usedElsewhere)
 
   const {
     register,
@@ -74,25 +65,16 @@ export function AssessmentForm({ assignmentId, assessment, usedElsewhere, onSave
       title: assessment?.title ?? '',
       type: assessment?.type ?? 'QUIZ',
       max_marks: assessment ? String(assessment.max_marks) : '',
-      weightage_percent: assessment ? String(assessment.weightage_percent) : '',
       date: assessment?.date ?? todayISO(),
     },
   })
 
   const onSubmit = handleSubmit(async (values) => {
     setNotice(null)
-    const weightage = Number(values.weightage_percent)
-    if (weightage > remaining) {
-      setError('weightage_percent', {
-        message: `Only ${formatNumber(remaining, 2)}% is left for this class (total cannot exceed 100%).`,
-      })
-      return
-    }
     const input: AssessmentInput = {
       title: values.title,
       type: values.type,
       max_marks: Number(values.max_marks),
-      weightage_percent: weightage,
       date: values.date,
     }
     try {
@@ -121,7 +103,10 @@ export function AssessmentForm({ assignmentId, assessment, usedElsewhere, onSave
 
   return (
     <Card>
-      <CardHeader title={heading} subtitle="All fields are required." />
+      <CardHeader
+        title={heading}
+        subtitle="All fields are required. Every graded assessment counts equally towards a student's average."
+      />
       <form onSubmit={onSubmit} noValidate className="space-y-4 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Title" htmlFor="as-title" error={errors.title?.message} className="sm:col-span-2">
@@ -167,25 +152,6 @@ export function AssessmentForm({ assignmentId, assessment, usedElsewhere, onSave
               invalid={!!errors.max_marks}
               aria-describedby={errors.max_marks ? 'as-max-msg' : undefined}
               {...register('max_marks')}
-            />
-          </Field>
-
-          <Field
-            label="Weightage (%)"
-            htmlFor="as-weight"
-            error={errors.weightage_percent?.message}
-            hint={`Up to ${formatNumber(remaining, 2)}% is available for this class.`}
-          >
-            <Input
-              id="as-weight"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
-              max="100"
-              invalid={!!errors.weightage_percent}
-              aria-describedby="as-weight-msg"
-              {...register('weightage_percent')}
             />
           </Field>
         </div>

@@ -19,12 +19,18 @@ class DashboardSubject(Schema):
     excused: int
     classes_held: int
     attendance_pct: float | None = None
+    class_avg_attendance_pct: float | None = Field(
+        None, description="Mean of the class's students' attendance percentages"
+    )
     classes_needed_for_threshold: int | None = Field(
         None, description="Consecutive classes to attend to reach the threshold; 0 if already there"
     )
-    weighted_score: float | None = None
-    class_avg: float | None = None
-    percentile: float | None = Field(None, description="This student's percentile in the class")
+    average_score_pct: float | None = Field(
+        None, description="Mean of the student's marks percentages over graded items"
+    )
+    class_avg_score_pct: float | None = Field(
+        None, description="Mean of the class's students' average score percentages"
+    )
     alerts: list[AlertOut]
 
 
@@ -36,6 +42,7 @@ class TrendPoint(Schema):
 
 class StudentDashboardOut(Schema):
     attendance_overall: float | None = None
+    average_score_overall: float | None = Field(None, description="Mean of the subject averages that exist")
     subjects: list[DashboardSubject]
     alerts: list[AlertOut]
     trend: list[TrendPoint]
@@ -51,7 +58,7 @@ class HistogramBucket(Schema):
 class AtRiskStudent(Schema):
     student: StudentBrief
     attendance_pct: float | None = None
-    weighted_score: float | None = None
+    average_score_pct: float | None = None
     alerts: list[AlertOut]
 
 
@@ -61,8 +68,10 @@ class ClassSummaryOut(Schema):
     section: SectionOut
     students: int
     sessions_held: int
-    attendance_pct: float | None = None
-    average_score: float | None = None
+    attendance_pct: float | None = Field(None, description="Class average of the students' attendance %")
+    average_score_pct: float | None = Field(
+        None, description="Class average of the students' average score %"
+    )
     marks_distribution: list[HistogramBucket]
     at_risk_students: list[AtRiskStudent]
 
@@ -74,8 +83,12 @@ class ClassStudentOut(Schema):
     late: int
     excused: int
     attendance_pct: float | None = None
+    average_score_pct: float | None = None
+    diff_from_class_attendance: float | None = Field(
+        None, description="Percentage points above (+) or below (-) the class average"
+    )
+    diff_from_class_score: float | None = Field(
+        None, description="Percentage points above (+) or below (-) the class average"
+    )
     classes_needed_for_threshold: int | None = None
-    weighted_score: float | None = None
-    rank: int | None = None
-    percentile: float | None = None
     alerts: list[AlertOut]

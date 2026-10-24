@@ -8,7 +8,6 @@ import { DataTable, type Column } from '../../components/faculty/DataTable'
 import { MarksSheet } from '../../components/faculty/MarksSheet'
 import { PageTitle } from '../../components/faculty/PageTitle'
 import { StatusBadge } from '../../components/faculty/StatusBadge'
-import { WeightageMeter } from '../../components/faculty/WeightageMeter'
 import { Button } from '../../components/ui/Button'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { StatusMessage, type Notice } from '../../components/ui/StatusMessage'
@@ -17,7 +16,6 @@ import { useAsyncData } from '../../hooks/useAsyncData'
 import { useSelectedClass } from '../../hooks/useSelectedClass'
 import { deleteAssessment, listAssessments, type Assessment } from '../../lib/faculty-api'
 import { errorMessage, formatDate, formatNumber } from '../../lib/format'
-import { weightageUsed } from '../../lib/marks'
 
 type FormState = { mode: 'create' } | { mode: 'edit'; assessment: Assessment } | null
 
@@ -41,7 +39,6 @@ export function AssessmentsPage() {
     selected ? listAssessments(selected.assignment_id) : Promise.resolve([]),
   )
   const assessments = list.data ?? []
-  const used = weightageUsed(assessments)
 
   const marksFor = Number(params.get('assessment'))
   const activeAssessment = assessments.find((a) => a.id === marksFor)
@@ -86,12 +83,6 @@ export function AssessmentsPage() {
     { key: 'type', header: 'Type', cell: (a) => <StatusBadge>{TYPE_LABEL[a.type]}</StatusBadge> },
     { key: 'date', header: 'Date', cell: (a) => <span className="whitespace-nowrap">{formatDate(a.date)}</span> },
     { key: 'max', header: 'Max', align: 'right', cell: (a) => <span className="tabular-nums">{formatNumber(a.max_marks, 2)}</span> },
-    {
-      key: 'weight',
-      header: 'Weightage',
-      align: 'right',
-      cell: (a) => <span className="tabular-nums">{formatNumber(a.weightage_percent, 2)}%</span>,
-    },
     {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
@@ -154,9 +145,8 @@ export function AssessmentsPage() {
       />
 
       <Card>
-        <div className="grid gap-5 p-5 lg:grid-cols-2 lg:items-end">
+        <div className="p-5 sm:max-w-md">
           <ClassPicker classes={classes} value={value} onChange={changeClass} />
-          <WeightageMeter used={used} />
         </div>
       </Card>
 
@@ -167,7 +157,6 @@ export function AssessmentsPage() {
           key={form.mode === 'edit' ? form.assessment.id : 'new'}
           assignmentId={selected.assignment_id}
           assessment={form.mode === 'edit' ? form.assessment : undefined}
-          usedElsewhere={weightageUsed(assessments, form.mode === 'edit' ? form.assessment.id : undefined)}
           onCancel={() => setForm(null)}
           onSaved={(saved) => {
             const created = form.mode === 'create'

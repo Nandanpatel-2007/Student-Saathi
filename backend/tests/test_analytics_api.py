@@ -38,13 +38,12 @@ def add_sessions(assignment, owner, statuses_by_student, start=TODAY - dt.timede
     return sessions
 
 
-def add_assessment(assignment, marks_by_student, title="Mid", max_marks=100, weight=100, day=0):
+def add_assessment(assignment, marks_by_student, title="Mid", max_marks=100, day=0):
     assessment = Assessment.objects.create(
         teaching_assignment=assignment,
         title=title,
         type="MIDTERM",
         max_marks=max_marks,
-        weightage_percent=weight,
         date=TODAY - dt.timedelta(days=20 - day),
     )
     for student, marks in marks_by_student.items():
@@ -100,12 +99,13 @@ def test_student_dashboard_values(client, klass):
     res = call(client, "get", "/students/me/dashboard", "stu1")
     assert res.status_code == 200
     body = res.json()
-    assert body["attendance_overall"] == 100
+    assert body["attendance_overall"] == 100 and body["average_score_overall"] == 90
     [subj] = body["subjects"]
     assert subj["subject"]["code"] == "CS301"
     assert subj["attendance_pct"] == 100 and subj["classes_held"] == 4
-    assert subj["weighted_score"] == 90 and subj["class_avg"] == 60
-    assert subj["percentile"] == pytest.approx(83.33)
+    assert subj["class_avg_attendance_pct"] == pytest.approx(66.67)  # mean of 100, 75, 25
+    assert subj["average_score_pct"] == 90 and subj["class_avg_score_pct"] == 60
+    assert not {"weighted_score", "percentile", "rank", "class_avg"} & set(subj)
     assert subj["alerts"] == [] and body["alerts"] == []
     assert body["trend"][-1]["attendance_pct"] == 100
 
@@ -140,9 +140,16 @@ def test_dashboard_access_control(client, klass, faculty_user, admin_user):
 def test_dashboard_for_student_with_no_data(client, student_user, subject):
     Enrollment.objects.create(student=student_user.student_profile, subject=subject)
     body = call(client, "get", "/students/me/dashboard", "stu1").json()
-    assert body["attendance_overall"] is None and body["trend"] == []
+    assert body["attendance_overall"] is None and body["average_score_overall"] is None
+    assert body["trend"] == []
     [subj] = body["subjects"]
-    assert subj["attendance_pct"] is None and subj["weighted_score"] is None and subj["class_avg"] is None
+    for field in (
+        "attendance_pct",
+        "class_avg_attendance_pct",
+        "average_score_pct",
+        "class_avg_score_pct",
+    ):
+        assert subj[field] is None
 
 
 def test_dashboard_without_student_profile_is_404(client, db):
@@ -151,9 +158,30 @@ def test_dashboard_without_student_profile_is_404(client, db):
 
 
 def test_dashboard_absent_in_assessment_counts_as_zero(client, klass, assignment, student_user):
-    add_assessment(assignment, {klass["s1"]: "AB", klass["s2"]: 50}, title="Quiz", weight=0, day=5)
-    # weight 0 -> contributes nothing; score unchanged
-    assert call(client, "get", "/students/me/dashboard", "stu1").json()["subjects"][0]["weighted_score"] == 90
+    add_assessment(assignment, {klass["s1"]: "AB", klass["s2"]: 50}, title="Quiz", day=5)
+    subj = call(client, "get", "/students/me/dashboard", "stu1").json()["subjects"][0]
+    assert subj["average_score_pct"] == 45  # mean of 90 and the absence (0)
+    # class: s1 45, s2 mean(60, 50)=55, s3 ungraded in the quiz -> mean(30) = 30 -> (45+55+30)/3
+    assert subj["class_avg_score_pct"] == pytest.approx(43.33)
+
+
+def test_ungraded_item_is_ignored_not_zero(client, klass, assignment):
+    add_assessment(assignment, {klass["s2"]: 50}, title="Quiz", day=5)  # s1 has no mark row for it
+    assert (
+        call(client, "get", "/students/me/dashboard", "stu1").json()["subjects"][0]["average_score_pct"] == 90
+    )
+
+
+def test_class_of_one_student_compares_with_itself(client, student_user, subject, assignment, faculty_user):
+    s1 = student_user.student_profile
+    Enrollment.objects.create(student=s1, subject=subject)
+    add_sessions(assignment, faculty_user, {s1: ["PRESENT", "ABSENT"]})
+    add_assessment(assignment, {s1: 70})
+    subj = call(client, "get", "/students/me/dashboard", "stu1").json()["subjects"][0]
+    assert subj["attendance_pct"] == subj["class_avg_attendance_pct"] == 50
+    assert subj["average_score_pct"] == subj["class_avg_score_pct"] == 70
+    row = call(client, "get", f"/faculty/classes/{assignment.id}/students", "fac1").json()["items"][0]
+    assert row["diff_from_class_attendance"] == 0 and row["diff_from_class_score"] == 0
 
 
 # ------------------------------------------------------------------ faculty summary / students
@@ -164,8 +192,8 @@ def test_class_summary(client, klass, assignment):
     assert res.status_code == 200
     body = res.json()
     assert body["students"] == 3 and body["sessions_held"] == 4
-    assert body["attendance_pct"] == pytest.approx(66.67)
-    assert body["average_score"] == 60
+    assert body["attendance_pct"] == pytest.approx(66.67)  # class average of 100, 75, 25
+    assert body["average_score_pct"] == 60
     dist = {b["label"]: b["count"] for b in body["marks_distribution"]}
     assert dist["30-40"] == 1 and dist["60-70"] == 1 and dist["90-100"] == 1
     assert sum(dist.values()) == 3
@@ -180,9 +208,15 @@ def test_class_students_list(client, klass, assignment):
     page = res.json()
     assert page["count"] == 3
     rows = {r["student"]["roll_no"]: r for r in page["items"]}
-    assert rows["R001"]["rank"] == 1 and rows["R001"]["attendance_pct"] == 100
-    assert rows["R002"]["attendance_pct"] == 75 and rows["R002"]["weighted_score"] == 60
-    assert rows["R003"]["rank"] == 3 and rows["R003"]["absent"] == 3
+    assert rows["R001"]["attendance_pct"] == 100 and rows["R001"]["average_score_pct"] == 90
+    assert rows["R001"]["diff_from_class_attendance"] == pytest.approx(33.33)
+    assert rows["R001"]["diff_from_class_score"] == 30
+    assert rows["R002"]["attendance_pct"] == 75 and rows["R002"]["average_score_pct"] == 60
+    assert rows["R002"]["diff_from_class_attendance"] == pytest.approx(8.33)
+    assert rows["R002"]["diff_from_class_score"] == 0
+    assert rows["R003"]["absent"] == 3 and rows["R003"]["diff_from_class_score"] == -30
+    assert rows["R003"]["diff_from_class_attendance"] == pytest.approx(-41.67)
+    assert not {"rank", "percentile", "weighted_score"} & set(rows["R001"])
 
     small = call(client, "get", f"/faculty/classes/{assignment.id}/students?page_size=2", "fac1").json()
     assert len(small["items"]) == 2 and small["total_pages"] == 2
@@ -201,7 +235,7 @@ def test_class_endpoints_scoping(client, klass, assignment, other_faculty, admin
 
 def test_empty_class_summary(client, assignment):
     body = call(client, "get", f"/faculty/classes/{assignment.id}/summary", "fac1").json()
-    assert body["students"] == 0 and body["attendance_pct"] is None and body["average_score"] is None
+    assert body["students"] == 0 and body["attendance_pct"] is None and body["average_score_pct"] is None
     assert body["at_risk_students"] == [] and sum(b["count"] for b in body["marks_distribution"]) == 0
 
 
@@ -215,19 +249,26 @@ def test_attendance_csv_export(client, klass, assignment):
     assert 'filename="CS301-A-attendance.csv"' in res["Content-Disposition"]
     lines = res.content.decode().strip().splitlines()
     assert lines[0].startswith("Roll No,Name,") and lines[0].endswith(
-        "Present,Late,Absent,Excused,Attendance %"
+        "Present,Late,Absent,Excused,Attendance %,Diff vs class (pts)"
     )
     assert len(lines) == 4
     assert lines[3].split(",")[2:6] == ["P", "A", "A", "A"]  # R003
-    assert lines[3].endswith(",1,0,3,0,25.0")
+    assert lines[3].endswith(",1,0,3,0,25.0,-41.67")
 
 
 def test_marks_csv_export(client, klass, assignment):
-    add_assessment(assignment, {klass["s1"]: "AB"}, title="Quiz", max_marks=20, weight=0, day=3)
+    add_assessment(assignment, {klass["s1"]: "AB"}, title="Quiz", max_marks=20, day=3)
     text = call(client, "get", f"/faculty/classes/{assignment.id}/export?type=marks", "fac1").content.decode()
     rows = list(csv.reader(io.StringIO(text)))
-    assert rows[0] == ["Roll No", "Name", "Mid (/100, 100%)", "Quiz (/20, 0%)", "Weighted score %"]
-    assert rows[1][2:4] == ["90", "AB"]
+    assert rows[0] == [
+        "Roll No",
+        "Name",
+        "Mid (/100)",
+        "Quiz (/20)",
+        "Average score %",
+        "Diff vs class (pts)",
+    ]
+    assert rows[1][2:5] == ["90", "AB", "45.0"]  # the absence counts as 0
     assert rows[2][3] == ""  # pending
 
 
@@ -279,8 +320,8 @@ def add_subject_class(i, faculty_profile, section, students, owner):
     for s in students:
         Enrollment.objects.create(student=s, subject=subject)
     add_sessions(assignment, owner, {s: ["PRESENT", "ABSENT", "LATE"] for s in students})
-    add_assessment(assignment, {s: 40 + 5 * n for n, s in enumerate(students)}, title="A", weight=50)
-    add_assessment(assignment, {s: 60 + 3 * n for n, s in enumerate(students)}, title="B", weight=50, day=5)
+    add_assessment(assignment, {s: 40 + 5 * n for n, s in enumerate(students)}, title="A")
+    add_assessment(assignment, {s: 60 + 3 * n for n, s in enumerate(students)}, title="B", day=5)
     return assignment
 
 
@@ -316,5 +357,5 @@ def test_class_endpoints_query_count_is_constant(client, klass, assignment, stud
 def test_json_is_serialisable_with_plain_numbers(client, klass):
     text = call(client, "get", "/students/me/dashboard", "stu1").content.decode()
     body = json.loads(text)
-    assert isinstance(body["subjects"][0]["weighted_score"], (int, float))
+    assert isinstance(body["subjects"][0]["average_score_pct"], (int, float))
     assert Section.objects.count() == 1

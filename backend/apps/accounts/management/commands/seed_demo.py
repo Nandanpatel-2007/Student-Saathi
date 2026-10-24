@@ -58,10 +58,10 @@ FIRST = [
 ]
 LAST = ["Sharma", "Verma", "Gupta", "Nair", "Patel", "Reddy", "Singh", "Das", "Mehta", "Kapoor"]
 
-ASSESSMENTS = [  # title, type, max, weightage, days after window start
-    ("Quiz 1", "QUIZ", 20, 20, 14),
-    ("Midterm", "MIDTERM", 50, 50, 28),
-    ("Assignment 1", "ASSIGNMENT", 30, 30, 40),
+ASSESSMENTS = [  # title, type, max marks, days after window start
+    ("Quiz 1", "QUIZ", 20, 14),
+    ("Midterm", "MIDTERM", 50, 28),
+    ("Assignment 1", "ASSIGNMENT", 30, 40),
 ]
 WINDOW_DAYS = 41  # ~6 weeks of classes
 
@@ -245,10 +245,9 @@ class Command(BaseCommand):
                 title=title,
                 type=kind,
                 max_marks=max_marks,
-                weightage_percent=weight,
                 date=start + dt.timedelta(days=offset),
             )
-            for title, kind, max_marks, weight, offset in ASSESSMENTS
+            for title, kind, max_marks, offset in ASSESSMENTS
         ]
         marks = []
         for student in roster:

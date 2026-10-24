@@ -1,11 +1,9 @@
 """Assessment and marks business logic."""
 
 import datetime as dt
-from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Sum
 from ninja.errors import HttpError
 
 from api.errors import DetailedHttpError
@@ -13,8 +11,6 @@ from apps.academics.models import TeachingAssignment
 from apps.accounts.models import Role, StudentProfile, User
 
 from .models import Assessment, Mark
-
-WEIGHTAGE_CAP = Decimal("100")
 
 # ---------------------------------------------------------------- scoping / permissions
 
@@ -100,41 +96,16 @@ def get_assessment(user: User, assessment_id: int) -> Assessment:
     return assessment
 
 
-def _check_weightage(assignment_id: int, new_weightage: Decimal, exclude_pk: int | None = None) -> None:
-    """Total weightage per teaching assignment (one subject taught to one section) may not exceed 100."""
-    others = Assessment.objects.filter(teaching_assignment_id=assignment_id)
-    if exclude_pk is not None:
-        others = others.exclude(pk=exclude_pk)
-    used = others.aggregate(total=Sum("weightage_percent"))["total"] or Decimal("0")
-    if used + new_weightage > WEIGHTAGE_CAP:
-        raise DetailedHttpError(
-            422,
-            f"Total weightage for this subject would be {used + new_weightage}%, exceeding 100%",
-            [
-                {
-                    "field": "weightage_percent",
-                    "message": f"At most {WEIGHTAGE_CAP - used}% remains for this subject",
-                }
-            ],
-        )
-
-
 def create_assessment(user: User, data: dict) -> Assessment:
     assignment = _get_assignment(data.pop("teaching_assignment_id"))
     _assert_can_write(user, assignment)
-    with transaction.atomic():
-        # Lock the assignment row so concurrent creates cannot jointly exceed the cap.
-        TeachingAssignment.objects.select_for_update().get(pk=assignment.pk)
-        _check_weightage(assignment.pk, data["weightage_percent"])
-        assessment = Assessment.objects.create(teaching_assignment=assignment, **data)
+    assessment = Assessment.objects.create(teaching_assignment=assignment, **data)
     return _reload(assessment.pk)
 
 
 def update_assessment(user: User, assessment_id: int, data: dict) -> Assessment:
     assessment = _get_writable_assessment(user, assessment_id)
     with transaction.atomic():
-        TeachingAssignment.objects.select_for_update().get(pk=assessment.teaching_assignment_id)
-        _check_weightage(assessment.teaching_assignment_id, data["weightage_percent"], assessment.pk)
         if Mark.objects.filter(assessment=assessment, marks_obtained__gt=data["max_marks"]).exists():
             raise DetailedHttpError(
                 422,

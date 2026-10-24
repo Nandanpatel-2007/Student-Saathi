@@ -7,18 +7,19 @@ import { AlertChips } from '../../components/faculty/StatusBadge'
 import { AlertList } from '../../components/student/AlertList'
 import { ScoreBars } from '../../components/student/ScoreBars'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { DiffIndicator } from '../../components/ui/DiffIndicator'
 import { EmptyState } from '../../components/ui/States'
 import { useStudentContext } from '../../hooks/useStudentContext'
-import { cn } from '../../lib/cn'
-import { formatNumber, formatPercent } from '../../lib/format'
+import { compare } from '../../lib/compare'
+import { formatPercent } from '../../lib/format'
 import type { SubjectStats } from '../../lib/student-api'
-import { SCORE_ALERT_CODES, computeTotals, ordinal } from '../../lib/student-derive'
+import { SCORE_ALERT_CODES, computeTotals } from '../../lib/student-derive'
 
 export function PerformancePage() {
   const { data } = useStudentContext()
   const totals = computeTotals(data.subjects)
   const scoreAlerts = data.alerts.filter((a) => SCORE_ALERT_CODES.includes(a.code))
-  const anyGraded = totals.averageScore !== null
+  const anyGraded = data.average_score_overall !== null
 
   const columns: Column<SubjectStats>[] = [
     {
@@ -33,42 +34,30 @@ export function PerformancePage() {
     },
     {
       key: 'score',
-      header: 'Weighted score',
+      header: 'Your average',
       align: 'right',
       cell: (s) =>
-        s.weighted_score === null ? (
-          <span className="text-muted">Not graded yet</span>
+        s.average_score_pct === null ? (
+          <span className="text-muted">No data yet</span>
         ) : (
-          <span className="font-medium tabular-nums">{formatPercent(s.weighted_score)}</span>
+          <span className="font-medium tabular-nums">{formatPercent(s.average_score_pct)}</span>
         ),
     },
     {
       key: 'avg',
-      header: 'Class average',
+      header: 'Class avg',
       align: 'right',
-      cell: (s) => <span className="tabular-nums">{formatPercent(s.class_avg)}</span>,
+      cell: (s) =>
+        s.class_avg_score_pct === null ? (
+          <span className="text-muted">No data yet</span>
+        ) : (
+          <span className="tabular-nums">{formatPercent(s.class_avg_score_pct)}</span>
+        ),
     },
     {
       key: 'diff',
-      header: 'Difference',
-      align: 'right',
-      cell: (s) => {
-        if (s.weighted_score === null || s.class_avg === null) return <span className="text-muted">—</span>
-        const diff = s.weighted_score - s.class_avg
-        return (
-          <span className={cn('tabular-nums', diff < 0 ? 'text-danger-ink' : 'text-accent-text')}>
-            {diff > 0 ? '+' : ''}
-            {formatNumber(diff)} pts
-          </span>
-        )
-      },
-    },
-    {
-      key: 'pct',
-      header: 'Your percentile',
-      align: 'right',
-      cell: (s) =>
-        s.percentile === null ? <span className="text-muted">—</span> : <span className="tabular-nums">{ordinal(s.percentile)}</span>,
+      header: 'You vs class',
+      cell: (s) => <DiffIndicator comparison={compare(s.average_score_pct, s.class_avg_score_pct)} />,
     },
     {
       key: 'alerts',
@@ -79,7 +68,7 @@ export function PerformancePage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle title="Performance" subtitle="Your weighted score in each subject compared with the class average." />
+      <PageTitle title="Performance" subtitle="Your average marks in each subject compared with the class average." />
 
       {scoreAlerts.length > 0 && (
         <Card className="border-danger-line">
@@ -90,21 +79,21 @@ export function PerformancePage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Average weighted score"
-          value={formatPercent(totals.averageScore)}
-          caption={anyGraded ? 'Across graded subjects' : 'Nothing graded yet'}
+          title="Average marks"
+          value={data.average_score_overall === null ? 'No data yet' : formatPercent(data.average_score_overall)}
+          caption={anyGraded ? 'Mean of your subject averages' : 'Nothing graded yet'}
           icon={GraduationCap}
         />
         <StatCard
           title="Best subject"
-          value={totals.best ? formatPercent(totals.best.weighted_score) : '—'}
+          value={totals.best ? formatPercent(totals.best.average_score_pct) : 'No data yet'}
           caption={totals.best ? totals.best.subject.name : 'Nothing graded yet'}
           icon={Award}
         />
         <StatCard
           title="Below class average"
-          value={String(totals.belowClassAverage)}
-          caption="Graded subjects"
+          value={String(totals.belowClassScore)}
+          caption="Subjects, marks"
           icon={TrendingDown}
         />
         <StatCard
@@ -116,7 +105,7 @@ export function PerformancePage() {
       </div>
 
       <Card>
-        <CardHeader title="Score by subject" subtitle="Weighted score and class average" />
+        <CardHeader title="Marks by subject" subtitle="You and the class average" />
         {anyGraded ? (
           <ScoreBars subjects={data.subjects} />
         ) : (
@@ -125,7 +114,10 @@ export function PerformancePage() {
       </Card>
 
       <Card>
-        <CardHeader title="Details" subtitle="Percentile is your own position in the class; other students' marks are never shown." />
+        <CardHeader
+          title="Details"
+          subtitle="The class average is a single combined figure; other students' marks are never shown."
+        />
         <DataTable caption="Performance by subject" columns={columns} rows={data.subjects} rowKey={(s) => s.subject.id} />
       </Card>
     </div>

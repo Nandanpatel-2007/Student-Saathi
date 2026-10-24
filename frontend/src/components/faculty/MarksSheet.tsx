@@ -218,7 +218,7 @@ function MarksEditor({ sheet }: { sheet: MarksSheetData }) {
       <Card>
         <CardHeader
           title={assessment.title}
-          subtitle={`Out of ${formatNumber(max, 2)} · ${formatNumber(assessment.weightage_percent, 2)}% weightage · blank means not graded yet`}
+          subtitle={`Out of ${formatNumber(max, 2)} · blank means not graded yet`}
           action={
             <div className="flex flex-wrap items-center gap-2">
               {dirty && <span className="text-sm text-accent-text">Unsaved changes</span>}

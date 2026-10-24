@@ -4,9 +4,9 @@ export interface FacultyTotals {
   classes: number
   /** Sum of class sizes: a student taught in two of the faculty's classes counts twice. */
   students: number
-  /** Class attendance averaged with each class weighted by its student count; null if no data. */
+  /** Mean of the class attendance figures, each class counted in proportion to its size; null if no data. */
   attendancePct: number | null
-  /** Class average score, weighted the same way; null if no class has graded marks. */
+  /** Mean of the class average scores, counted the same way; null if no class has graded marks. */
   averageScore: number | null
   /** Distinct students flagged at risk in at least one class. */
   atRiskStudents: number
@@ -14,7 +14,7 @@ export interface FacultyTotals {
   distribution: HistogramBucket[]
 }
 
-function weightedMean(pairs: Array<{ value: number | null; weight: number }>): number | null {
+function sizeScaledMean(pairs: Array<{ value: number | null; weight: number }>): number | null {
   let total = 0
   let weights = 0
   for (const { value, weight } of pairs) {
@@ -44,8 +44,8 @@ export function aggregateSummaries(summaries: readonly ClassSummary[]): FacultyT
   return {
     classes: summaries.length,
     students: summaries.reduce((sum, s) => sum + s.students, 0),
-    attendancePct: weightedMean(summaries.map((s) => ({ value: s.attendance_pct, weight: s.students }))),
-    averageScore: weightedMean(summaries.map((s) => ({ value: s.average_score, weight: s.students }))),
+    attendancePct: sizeScaledMean(summaries.map((s) => ({ value: s.attendance_pct, weight: s.students }))),
+    averageScore: sizeScaledMean(summaries.map((s) => ({ value: s.average_score_pct, weight: s.students }))),
     atRiskStudents: atRisk.size,
     distribution: [...buckets.values()].sort((a, b) => a.min - b.min),
   }

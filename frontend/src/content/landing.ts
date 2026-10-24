@@ -59,12 +59,12 @@ export const landing: LandingContent = {
       {
         icon: PenLine,
         title: 'Assessment marks',
-        description: 'Enter quiz, midterm and assignment marks in bulk, with weightage checked for you.',
+        description: 'Enter quiz, midterm and assignment marks in bulk, with limits checked for you.',
       },
       {
         icon: Percent,
         title: 'Attendance % and subject-wise performance',
-        description: 'Attendance and weighted scores per subject, plus how far you are from the minimum.',
+        description: 'Attendance and average marks per subject, each shown next to the class average.',
       },
       {
         icon: ChartColumn,
@@ -98,7 +98,7 @@ export const landing: LandingContent = {
       {
         icon: Calculator,
         title: 'Calculate Statistics',
-        description: 'Percentages, weighted scores and alerts are worked out automatically.',
+        description: 'Percentages, averages and alerts are worked out automatically.',
       },
       {
         icon: LayoutDashboard,
@@ -138,7 +138,7 @@ export const landing: LandingContent = {
         lead: 'Know where you stand while there is still time to act.',
         outcomes: [
           'See your attendance in every subject, and how many classes you need to reach the minimum.',
-          'Follow weighted scores and compare with the class average without seeing anyone else’s marks.',
+          'See your average marks and attendance next to the class average, without seeing anyone else’s marks.',
           'Get early alerts for low attendance or a sudden drop in results.',
         ],
       },
@@ -148,7 +148,7 @@ export const landing: LandingContent = {
         lead: 'Spend less time on registers and more time teaching.',
         outcomes: [
           'Record a whole class’s attendance in moments, then adjust just the exceptions.',
-          'Enter marks once and let percentages and weighted scores update themselves.',
+          'Enter marks once and let percentages and class comparisons update themselves.',
           'Spot at-risk students early and export class sheets as CSV.',
         ],
       },

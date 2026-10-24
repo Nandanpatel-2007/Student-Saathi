@@ -78,14 +78,16 @@ const classSummarySchema = z.object({
   section: sectionSchema,
   students: z.number(),
   sessions_held: z.number(),
+  /** Class average of the students' attendance percentages. */
   attendance_pct: z.number().nullable(),
-  average_score: z.number().nullable(),
+  /** Class average of the students' average score percentages. */
+  average_score_pct: z.number().nullable(),
   marks_distribution: z.array(bucketSchema),
   at_risk_students: z.array(
     z.object({
       student: studentBriefSchema,
       attendance_pct: z.number().nullable(),
-      weighted_score: z.number().nullable(),
+      average_score_pct: z.number().nullable(),
       alerts: z.array(alertSchema),
     }),
   ),
@@ -104,10 +106,11 @@ const classStudentSchema = z.object({
   late: z.number(),
   excused: z.number(),
   attendance_pct: z.number().nullable(),
+  average_score_pct: z.number().nullable(),
+  /** Percentage points above (+) or below (-) the class average. */
+  diff_from_class_attendance: z.number().nullable(),
+  diff_from_class_score: z.number().nullable(),
   classes_needed_for_threshold: z.number().nullable(),
-  weighted_score: z.number().nullable(),
-  rank: z.number().nullable(),
-  percentile: z.number().nullable(),
   alerts: z.array(alertSchema),
 })
 export type ClassStudent = z.infer<typeof classStudentSchema>
@@ -251,7 +254,6 @@ const assessmentSchema = z.object({
   title: z.string(),
   type: z.enum(ASSESSMENT_TYPES),
   max_marks: z.number(),
-  weightage_percent: z.number(),
   date: z.string(),
 })
 export type Assessment = z.infer<typeof assessmentSchema>
@@ -260,7 +262,6 @@ export interface AssessmentInput {
   title: string
   type: AssessmentType
   max_marks: number
-  weightage_percent: number
   date: string
 }
 

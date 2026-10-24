@@ -11,12 +11,14 @@ const subjectStatsSchema = z.object({
   excused: z.number(),
   classes_held: z.number(),
   attendance_pct: z.number().nullable(),
+  /** Mean of the class's students' attendance percentages. */
+  class_avg_attendance_pct: z.number().nullable(),
   /** Classes to attend in a row to reach the threshold; 0 when already there. */
   classes_needed_for_threshold: z.number().nullable(),
-  weighted_score: z.number().nullable(),
-  class_avg: z.number().nullable(),
-  /** This student's own percentile in the class. */
-  percentile: z.number().nullable(),
+  /** Mean of this student's marks percentages over graded items. */
+  average_score_pct: z.number().nullable(),
+  /** Mean of the class's students' average score percentages. */
+  class_avg_score_pct: z.number().nullable(),
   alerts: z.array(alertSchema),
 })
 
@@ -29,6 +31,7 @@ const trendPointSchema = z.object({
 
 const dashboardSchema = z.object({
   attendance_overall: z.number().nullable(),
+  average_score_overall: z.number().nullable(),
   subjects: z.array(subjectStatsSchema),
   alerts: z.array(alertSchema),
   trend: z.array(trendPointSchema),

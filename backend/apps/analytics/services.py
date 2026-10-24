@@ -7,7 +7,7 @@ presentation code rounds. `None` means "not enough data" (e.g. no classes held y
 import datetime as dt
 import math
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 
@@ -70,7 +70,7 @@ class AttendanceCounts:
         )
 
     @classmethod
-    def from_status_counts(cls, status_counts: Mapping[str, int]) -> "AttendanceCounts":
+    def from_status_counts(cls, status_counts: dict[str, int]) -> "AttendanceCounts":
         return cls(
             present=status_counts.get("PRESENT", 0),
             absent=status_counts.get("ABSENT", 0),
@@ -81,12 +81,11 @@ class AttendanceCounts:
 
 @dataclass(frozen=True)
 class MarkEntry:
-    """One student's result in one assessment."""
+    """One student's result in one graded item (an assessment, later also an assignment)."""
 
-    assessment_id: int
+    item_id: int
     date: dt.date
     max_marks: float
-    weightage: float
     marks_obtained: float | None = None
     is_absent: bool = False
 
@@ -109,12 +108,20 @@ class Alert:
     message: str
 
 
-@dataclass(frozen=True)
-class Standing:
-    class_avg: float | None
-    rank: int | None
-    percentile: float | None
-    graded_students: int
+# ---------------------------------------------------------------- generic helpers
+
+
+def class_average(values: Iterable[float | None]) -> float | None:
+    """Mean of the values that exist (None ignored); None when there are none."""
+    present = [v for v in values if v is not None]
+    return sum(present) / len(present) if present else None
+
+
+def diff_points(value: float | None, average: float | None) -> float | None:
+    """How many percentage points `value` is above (+) or below (-) `average`; None if either is missing."""
+    if value is None or average is None:
+        return None
+    return value - average
 
 
 # ---------------------------------------------------------------- attendance
@@ -176,29 +183,24 @@ def monthly_trend(rows: Iterable[tuple[str, str, int]], cfg: AnalyticsConfig) ->
 # ---------------------------------------------------------------- marks
 
 
-def weighted_score(entries: Sequence[MarkEntry]) -> float | None:
-    """Weighted score % over the assessments graded so far.
+def average_score(entries: Sequence[MarkEntry]) -> float | None:
+    """Mean of (marks / max * 100) over the graded items; every item counts equally.
 
-    Each graded assessment contributes (marks / max) * weightage; the total is divided by the
-    weightage of graded assessments only, so pending assessments do not drag the score down.
-    An absent student scores 0 for that assessment. None if nothing graded carries weight.
+    Items not graded yet are ignored. An item the student was absent for counts as 0.
+    None when nothing is graded.
     """
-    graded = [e for e in entries if e.percent is not None]
-    total_weight = sum(e.weightage for e in graded)
-    if total_weight <= 0:
-        return None
-    return sum(e.percent * e.weightage for e in graded) / total_weight
+    return class_average(e.percent for e in entries)
 
 
 def detect_sharp_drop(entries: Sequence[MarkEntry], cfg: AnalyticsConfig) -> tuple[float, float] | None:
     """(previous %, latest %) when the latest score fell by more than the configured points.
 
-    Compares the two most recent assessments where the student actually sat the paper
-    (absences are not comparable).
+    Compares the two most recent items where the student actually sat the paper
+    (absences are not comparable), ordered by date then id.
     """
     sat = sorted(
         (e for e in entries if not e.is_absent and e.percent is not None),
-        key=lambda e: (e.date, e.assessment_id),
+        key=lambda e: (e.date, e.item_id),
     )
     if len(sat) < 2:
         return None
@@ -206,25 +208,6 @@ def detect_sharp_drop(entries: Sequence[MarkEntry], cfg: AnalyticsConfig) -> tup
     if previous - latest > cfg.sharp_drop_points:
         return previous, latest
     return None
-
-
-def class_standing(scores: Mapping[int, float | None], student_id: int) -> Standing:
-    """Class average, competition rank (ties share a rank) and percentile for one student.
-
-    Percentile = (students below + half of those level, including self) / graded students * 100.
-    """
-    graded = {sid: s for sid, s in scores.items() if s is not None}
-    if not graded:
-        return Standing(None, None, None, 0)
-    average = sum(graded.values()) / len(graded)
-    mine = graded.get(student_id)
-    if mine is None:
-        return Standing(average, None, None, len(graded))
-    higher = sum(1 for s in graded.values() if s > mine)
-    below = sum(1 for s in graded.values() if s < mine)
-    level = len(graded) - higher - below
-    percentile = (below + level / 2) / len(graded) * 100
-    return Standing(average, higher + 1, percentile, len(graded))
 
 
 def histogram(values: Iterable[float | None], bucket_size: int = 10, upper: int = 100) -> list[dict]:
@@ -279,7 +262,7 @@ def build_alerts(
             Alert(
                 FAILING_SUBJECT,
                 "critical",
-                f"Weighted score {score:.1f}% is below the pass mark of {cfg.pass_mark:g}%",
+                f"Average score {score:.1f}% is below the pass mark of {cfg.pass_mark:g}%",
             )
         )
     drop = detect_sharp_drop(entries, cfg)
@@ -301,7 +284,7 @@ class SubjectMetrics:
     counts: AttendanceCounts
     attendance_pct: float | None
     classes_needed: int | None
-    weighted_score: float | None
+    average_score: float | None
     alerts: list[Alert] = field(default_factory=list)
 
 
@@ -309,11 +292,11 @@ def subject_metrics(
     counts: AttendanceCounts, entries: Sequence[MarkEntry], cfg: AnalyticsConfig
 ) -> SubjectMetrics:
     pct = attendance_percentage(counts, cfg)
-    score = weighted_score(entries)
+    score = average_score(entries)
     return SubjectMetrics(
         counts=counts,
         attendance_pct=pct,
         classes_needed=classes_needed_to_reach(counts, cfg),
-        weighted_score=score,
+        average_score=score,
         alerts=build_alerts(pct, score, entries, cfg),
     )

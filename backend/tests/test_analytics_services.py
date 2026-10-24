@@ -15,12 +15,11 @@ def counts(present=0, absent=0, late=0, excused=0):
     return AttendanceCounts(present=present, absent=absent, late=late, excused=excused)
 
 
-def entry(i, pct_of_100=None, *, absent=False, weight=10, max_marks=100, day=1):
+def entry(i, pct_of_100=None, *, absent=False, max_marks=100, day=1):
     return MarkEntry(
-        assessment_id=i,
+        item_id=i,
         date=D(2025, 9, day),
         max_marks=max_marks,
-        weightage=weight,
         marks_obtained=pct_of_100,
         is_absent=absent,
     )
@@ -135,61 +134,59 @@ def test_monthly_trend_empty():
     assert svc.monthly_trend([], CFG) == []
 
 
-# ------------------------------------------------------------------ weighted score
+# ------------------------------------------------------------------ average score
 
 
-def test_weighted_score_basic():
-    entries = [entry(1, 80, weight=40), entry(2, 50, weight=60)]
-    assert svc.weighted_score(entries) == pytest.approx(62)
+def test_average_score_is_the_plain_mean_of_item_percentages():
+    # every graded item counts equally, whatever its max marks
+    entries = [entry(1, 15, max_marks=20), entry(2, 50, max_marks=100), entry(3, 9, max_marks=10)]
+    assert svc.average_score(entries) == pytest.approx((75 + 50 + 90) / 3)
 
 
-def test_weighted_score_scales_by_max_marks():
-    assert svc.weighted_score([entry(1, 15, max_marks=20, weight=100)]) == pytest.approx(75)
+def test_ungraded_items_are_ignored_not_counted_as_zero():
+    assert svc.average_score([entry(1, 80), entry(2, None)]) == pytest.approx(80)
 
 
-def test_pending_assessments_do_not_count():
-    entries = [entry(1, 80, weight=20), entry(2, None, weight=80)]
-    assert svc.weighted_score(entries) == pytest.approx(80)
+def test_absent_counts_as_zero():
+    assert svc.average_score([entry(1, 80), entry(2, absent=True)]) == pytest.approx(40)
 
 
-def test_absent_counts_as_zero_unlike_pending():
-    entries = [entry(1, 80, weight=50), entry(2, absent=True, weight=50)]
-    assert svc.weighted_score(entries) == pytest.approx(40)
+def test_nothing_graded_is_none():
+    assert svc.average_score([]) is None
+    assert svc.average_score([entry(1, None), entry(2, None)]) is None
 
 
-def test_nothing_graded_or_zero_weight_is_none():
-    assert svc.weighted_score([]) is None
-    assert svc.weighted_score([entry(1, None)]) is None
-    assert svc.weighted_score([entry(1, 50, weight=0)]) is None
+def test_zero_marks_is_a_real_score_but_zero_max_is_ignored():
+    assert svc.average_score([entry(1, 0)]) == 0
+    assert svc.average_score([entry(1, 0, max_marks=0)]) is None
+    assert svc.average_score([entry(1, 5, max_marks=0), entry(2, 50)]) == pytest.approx(50)
 
 
-def test_zero_max_marks_is_ignored_safely():
-    assert svc.weighted_score([entry(1, 0, max_marks=0)]) is None
+def test_only_absences_gives_zero_not_none():
+    assert svc.average_score([entry(1, absent=True)]) == 0
 
 
-# ------------------------------------------------------------------ standing
+# ------------------------------------------------------------------ class average and differences
 
 
-def test_class_standing_rank_ties_and_percentile():
-    scores = {1: 90.0, 2: 70.0, 3: 70.0, 4: 50.0, 5: None}
-    top = svc.class_standing(scores, 1)
-    assert (top.rank, top.graded_students) == (1, 4)
-    assert top.class_avg == pytest.approx(70)
-    assert top.percentile == pytest.approx(87.5)  # 3 below / 4
-    tied = svc.class_standing(scores, 2)
-    assert tied.rank == 2 and svc.class_standing(scores, 3).rank == 2
-    assert tied.percentile == pytest.approx(50)  # (1 below + 1 level) / 4
-    assert svc.class_standing(scores, 4).rank == 4
+def test_class_average_ignores_nulls():
+    assert svc.class_average([80, None, 60]) == pytest.approx(70)
+    assert svc.class_average([None, None]) is None
+    assert svc.class_average([]) is None
+    assert svc.class_average(x for x in [10.0, 20.0]) == pytest.approx(15)
 
 
-def test_class_standing_ungraded_student_still_sees_average():
-    standing = svc.class_standing({1: 60.0, 2: None}, 2)
-    assert standing.rank is None and standing.percentile is None and standing.class_avg == 60
+def test_class_with_a_single_student_averages_to_that_student():
+    assert svc.class_average([62.5]) == 62.5
+    assert svc.diff_points(62.5, svc.class_average([62.5])) == 0
 
 
-def test_class_standing_empty_and_single():
-    assert svc.class_standing({}, 1) == svc.Standing(None, None, None, 0)
-    assert svc.class_standing({1: 33.0}, 1).percentile == 50
+def test_diff_points_sign_and_nulls():
+    assert svc.diff_points(80, 70) == pytest.approx(10)
+    assert svc.diff_points(60, 70) == pytest.approx(-10)
+    assert svc.diff_points(None, 70) is None
+    assert svc.diff_points(70, None) is None
+    assert svc.diff_points(None, None) is None
 
 
 # ------------------------------------------------------------------ histogram
@@ -232,7 +229,8 @@ def test_attendance_alert_boundaries(pct, expected):
 
 
 @pytest.mark.parametrize(
-    ("score", "expected"), [(None, []), (39.99, [svc.FAILING_SUBJECT]), (40, []), (0, [svc.FAILING_SUBJECT])]
+    ("score", "expected"),
+    [(None, []), (39.99, [svc.FAILING_SUBJECT]), (40, []), (0, [svc.FAILING_SUBJECT])],
 )
 def test_failing_boundaries(score, expected):
     assert codes(svc.build_alerts(100, score, [], CFG)) == expected
@@ -240,6 +238,11 @@ def test_failing_boundaries(score, expected):
 
 def test_failing_threshold_is_configurable():
     assert codes(svc.build_alerts(100, 50, [], AnalyticsConfig(pass_mark=60))) == [svc.FAILING_SUBJECT]
+
+
+def test_failing_message_mentions_average_not_weighted():
+    [alert] = svc.build_alerts(100, 30, [], CFG)
+    assert "Average score" in alert.message and "weighted" not in alert.message.lower()
 
 
 def test_sharp_drop_strictly_greater_than_15():
@@ -253,7 +256,11 @@ def test_sharp_drop_uses_latest_two_in_date_order_not_input_order():
     assert svc.detect_sharp_drop([entry(1, 90, day=1), entry(2, 45, day=2)], CFG) == (90, 45)
 
 
-def test_sharp_drop_ignores_absences_pending_and_single_assessment():
+def test_sharp_drop_same_day_ties_break_by_id():
+    assert svc.detect_sharp_drop([entry(2, 40, day=1), entry(1, 90, day=1)], CFG) == (90, 40)
+
+
+def test_sharp_drop_ignores_absences_pending_and_single_item():
     assert svc.detect_sharp_drop([entry(1, 90, day=1)], CFG) is None
     assert svc.detect_sharp_drop([entry(1, 90, day=1), entry(2, absent=True, day=2)], CFG) is None
     assert svc.detect_sharp_drop([entry(1, 90, day=1), entry(2, None, day=2)], CFG) is None
@@ -269,8 +276,9 @@ def test_improvement_is_not_a_drop():
 
 
 def test_multiple_alerts_and_at_risk():
-    entries = [entry(1, 80, day=1, weight=10), entry(2, 10, day=2, weight=30)]  # weighted 27.5
-    alerts = svc.build_alerts(60, svc.weighted_score(entries), entries, CFG)
+    entries = [entry(1, 80, day=1), entry(2, 10, day=2)]  # average 45 ... pass mark raised below
+    cfg = AnalyticsConfig(pass_mark=50)
+    alerts = svc.build_alerts(60, svc.average_score(entries), entries, cfg)
     assert codes(alerts) == [svc.LOW_ATTENDANCE, svc.FAILING_SUBJECT, svc.SHARP_DROP]
     assert svc.is_at_risk(alerts)
     assert not svc.is_at_risk(svc.build_alerts(77, 90, [], CFG))  # warning alone is not at-risk
@@ -278,5 +286,12 @@ def test_multiple_alerts_and_at_risk():
 
 def test_subject_metrics_with_no_data_is_all_empty():
     m = svc.subject_metrics(counts(), [], CFG)
-    assert m.attendance_pct is None and m.weighted_score is None and m.alerts == []
+    assert m.attendance_pct is None and m.average_score is None and m.alerts == []
     assert m.classes_needed == 0
+
+
+def test_subject_metrics_ties_attendance_and_average_together():
+    entries = [entry(1, 60, day=1), entry(2, 50, day=2)]
+    m = svc.subject_metrics(counts(present=3, absent=1), entries, CFG)
+    assert m.attendance_pct == pytest.approx(75) and m.average_score == pytest.approx(55)
+    assert codes(m.alerts) == [svc.ATTENDANCE_WARNING]

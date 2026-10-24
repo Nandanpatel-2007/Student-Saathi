@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/States'
 import { useStudentContext } from '../../hooks/useStudentContext'
+import { formatPercent } from '../../lib/format'
 import { computeTotals, greeting } from '../../lib/student-derive'
 
 const ALERTS_SHOWN = 4
@@ -62,6 +63,12 @@ export function DashboardPage() {
               {totals.held === 0
                 ? 'No classes have been recorded yet.'
                 : `${totals.present + totals.late} of ${totals.held} classes attended.`}
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Average marks:{' '}
+              <span className="font-medium text-ink">
+                {data.average_score_overall === null ? 'No data yet' : formatPercent(data.average_score_overall)}
+              </span>
             </p>
             {totals.subjectsWithAttendanceAlert > 0 && (
               <p className="mt-1 text-sm font-medium text-ink">

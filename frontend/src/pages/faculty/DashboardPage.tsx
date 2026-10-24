@@ -81,7 +81,7 @@ export function DashboardPage() {
             <StatCard
               title="Average score"
               value={formatPercent(totals?.averageScore)}
-              caption="Weighted, graded work only"
+              caption="Mean of the students’ average marks"
               icon={GraduationCap}
               loading={statsLoading}
             />
@@ -98,7 +98,7 @@ export function DashboardPage() {
             <Card className="xl:col-span-3">
               <CardHeader
                 title="Marks distribution"
-                subtitle={`Weighted scores of graded students${totals ? ` · average ${formatNumber(totals.averageScore)}%` : ''}`}
+                subtitle={`Average marks of graded students${totals ? ` · average ${formatNumber(totals.averageScore)}%` : ''}`}
               />
               {statsLoading ? (
                 <LoadingBlock label="Loading chart…" rows={5} />

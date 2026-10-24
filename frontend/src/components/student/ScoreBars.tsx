@@ -5,13 +5,13 @@ import type { SubjectStats } from '../../lib/student-api'
 
 const tick = { fill: 'var(--muted)', fontSize: 12 }
 
-/** Grouped bars: this student's weighted score next to the class average, per subject. */
+/** Grouped bars: this student's average score next to the class average, per subject. */
 export function ScoreBars({ subjects }: { subjects: readonly SubjectStats[] }) {
   const data = subjects.map((s) => ({
     code: s.subject.code,
     name: s.subject.name,
-    score: s.weighted_score,
-    average: s.class_avg,
+    score: s.average_score_pct,
+    average: s.class_avg_score_pct,
   }))
 
   return (
@@ -31,21 +31,21 @@ export function ScoreBars({ subjects }: { subjects: readonly SubjectStats[] }) {
                 color: 'var(--ink)',
               }}
               labelStyle={{ color: 'var(--ink)' }}
-              formatter={(value) => (typeof value === 'number' ? formatPercent(value) : 'Not graded')}
+              formatter={(value) => (typeof value === 'number' ? formatPercent(value) : 'No data yet')}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: 'var(--muted)' }} />
-            <Bar dataKey="score" name="Your weighted score" fill="var(--accent)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+            <Bar dataKey="score" name="You" fill="var(--accent)" radius={[4, 4, 0, 0]} maxBarSize={32} />
             <Bar dataKey="average" name="Class average" fill="var(--muted)" radius={[4, 4, 0, 0]} maxBarSize={32} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <figcaption className="sr-only">Weighted score compared with the class average for each subject.</figcaption>
+      <figcaption className="sr-only">Your average score compared with the class average for each subject.</figcaption>
       <table className="sr-only">
-        <caption>Weighted score and class average by subject</caption>
+        <caption>Average score and class average by subject</caption>
         <thead>
           <tr>
             <th scope="col">Subject</th>
-            <th scope="col">Your weighted score</th>
+            <th scope="col">Your average score</th>
             <th scope="col">Class average</th>
           </tr>
         </thead>
@@ -53,8 +53,8 @@ export function ScoreBars({ subjects }: { subjects: readonly SubjectStats[] }) {
           {data.map((row) => (
             <tr key={row.code}>
               <th scope="row">{row.name}</th>
-              <td>{row.score === null ? 'Not graded' : formatPercent(row.score)}</td>
-              <td>{row.average === null ? 'Not available' : formatPercent(row.average)}</td>
+              <td>{row.score === null ? 'No data yet' : formatPercent(row.score)}</td>
+              <td>{row.average === null ? 'No data yet' : formatPercent(row.average)}</td>
             </tr>
           ))}
         </tbody>

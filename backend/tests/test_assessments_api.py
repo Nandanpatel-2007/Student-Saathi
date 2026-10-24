@@ -56,7 +56,6 @@ def payload(assignment, **overrides):
         "title": "Quiz 1",
         "type": "QUIZ",
         "max_marks": 20,
-        "weightage_percent": 10,
         "date": "2025-09-01",
     }
     body.update(overrides)
@@ -64,7 +63,7 @@ def payload(assignment, **overrides):
 
 
 def make_assessment(assignment, **kw):
-    defaults = dict(title="Quiz", type="QUIZ", max_marks=20, weightage_percent=10, date=dt.date(2025, 9, 1))
+    defaults = dict(title="Quiz", type="QUIZ", max_marks=20, date=dt.date(2025, 9, 1))
     defaults.update(kw)
     return Assessment.objects.create(teaching_assignment=assignment, **defaults)
 
@@ -76,66 +75,39 @@ def test_faculty_assessment_crud(client, assignment):
     res = call(client, "post", "/assessments", "fac1", payload(assignment))
     assert res.status_code == 201
     body = res.json()
-    assert body["max_marks"] == 20 and body["weightage_percent"] == 10  # JSON numbers, not strings
+    assert body["max_marks"] == 20  # JSON numbers, not strings
+    assert "weightage_percent" not in body
     assert body["subject"]["code"] == "CS301" and body["type"] == "QUIZ"
     aid = body["id"]
 
     update = {
         k: v
-        for k, v in payload(assignment, title="Quiz One", weightage_percent=15).items()
+        for k, v in payload(assignment, title="Quiz One", max_marks=25).items()
         if k != "teaching_assignment_id"
     }
     res = call(client, "put", f"/assessments/{aid}", "fac1", update)
     assert res.status_code == 200 and res.json()["title"] == "Quiz One"
 
-    assert call(client, "get", f"/assessments/{aid}", "fac1").json()["weightage_percent"] == 15
+    assert call(client, "get", f"/assessments/{aid}", "fac1").json()["max_marks"] == 25
     assert call(client, "delete", f"/assessments/{aid}", "fac1").status_code == 204
     assert call(client, "get", f"/assessments/{aid}", "fac1").status_code == 404
 
 
 def test_assessment_validation(client, assignment):
-    for bad in ({"max_marks": 0}, {"weightage_percent": -1}, {"weightage_percent": 101}, {"type": "EXAM"}):
+    for bad in ({"max_marks": 0}, {"max_marks": -5}, {"type": "EXAM"}, {"title": ""}):
         assert call(client, "post", "/assessments", "fac1", payload(assignment, **bad)).status_code == 422
 
 
-def test_weightage_cannot_exceed_100_per_subject(client, assignment, subject, section, other_faculty):
-    assert (
-        call(client, "post", "/assessments", "fac1", payload(assignment, weightage_percent=60)).status_code
-        == 201
-    )
-    second = call(
-        client, "post", "/assessments", "fac1", payload(assignment, title="Mid", weightage_percent=40)
-    )
-    assert second.status_code == 201
-
-    over = call(
-        client, "post", "/assessments", "fac1", payload(assignment, title="Extra", weightage_percent="0.5")
-    )
-    assert over.status_code == 422
-    err = over.json()["error"]
-    assert "exceeding 100%" in err["message"] and err["details"][0]["field"] == "weightage_percent"
-
-    # Raising an existing assessment past the cap is also rejected; lowering is fine.
-    aid = second.json()["id"]
-    upd = {
-        k: v
-        for k, v in payload(assignment, title="Mid", weightage_percent=41).items()
-        if k != "teaching_assignment_id"
-    }
-    assert call(client, "put", f"/assessments/{aid}", "fac1", upd).status_code == 422
-    upd["weightage_percent"] = 30
-    assert call(client, "put", f"/assessments/{aid}", "fac1", upd).status_code == 200
-
-    # A different class has its own budget.
-    elsewhere = TeachingAssignment.objects.create(
-        faculty=other_faculty,
-        subject=subject,
-        section=Section.objects.create(name="B", program="B.Tech", semester=3, academic_year="2025-2026"),
-    )
-    assert (
-        call(client, "post", "/assessments", "fac2", payload(elsewhere, weightage_percent=100)).status_code
-        == 201
-    )
+def test_any_number_of_assessments_is_allowed_and_weightage_is_gone(client, assignment):
+    # There is no 100% budget any more: every graded item simply counts equally.
+    for i in range(12):
+        res = call(client, "post", "/assessments", "fac1", payload(assignment, title=f"Quiz {i}"))
+        assert res.status_code == 201
+        assert "weightage_percent" not in res.json()
+    # A leftover weightage field from an old client is ignored, not stored or validated.
+    res = call(client, "post", "/assessments", "fac1", payload(assignment, weightage_percent=900))
+    assert res.status_code == 201 and "weightage_percent" not in res.json()
+    assert not hasattr(Assessment.objects.first(), "weightage_percent")
 
 
 def test_cannot_lower_max_marks_below_recorded_marks(client, assignment, roster):
@@ -296,7 +268,7 @@ def test_student_sees_only_own_marks(client, assignment, roster, other_faculty):
 
 def test_assessment_reads_do_not_n_plus_one(client, assignment, roster, django_assert_max_num_queries):
     for i in range(6):
-        make_assessment(assignment, title=f"A{i}", weightage_percent=5)
+        make_assessment(assignment, title=f"A{i}")
     headers = auth_header(client, "fac1")
     with django_assert_max_num_queries(6):
         assert client.get("/api/v1/assessments", **headers).json()["count"] == 6

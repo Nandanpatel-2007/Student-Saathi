@@ -4,7 +4,7 @@ import type { HistogramBucket } from '../../lib/faculty-api'
 
 const tick = { fill: 'var(--muted)', fontSize: 12 }
 
-/** Bar chart of weighted-score buckets. Colours come from CSS variables so both themes work. */
+/** Bar chart of average-score buckets. Colours come from CSS variables so both themes work. */
 export function MarksDistributionChart({ buckets }: { buckets: readonly HistogramBucket[] }) {
   const total = buckets.reduce((sum, b) => sum + b.count, 0)
   const summary = buckets.filter((b) => b.count > 0).map((b) => `${b.label}%: ${b.count}`).join(', ')
@@ -34,7 +34,7 @@ export function MarksDistributionChart({ buckets }: { buckets: readonly Histogra
         </ResponsiveContainer>
       </div>
       <figcaption className="sr-only">
-        Distribution of weighted scores across {total} graded students. {summary || 'No graded students yet.'}
+        Distribution of average marks across {total} graded students. {summary || 'No graded students yet.'}
       </figcaption>
     </figure>
   )

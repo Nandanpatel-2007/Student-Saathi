@@ -6,7 +6,9 @@ import { AlertChips } from '../../components/faculty/StatusBadge'
 import { StatCard } from '../../components/faculty/StatCard'
 import { PercentBar } from '../../components/student/PercentBar'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { DiffIndicator } from '../../components/ui/DiffIndicator'
 import { useStudentContext } from '../../hooks/useStudentContext'
+import { compare } from '../../lib/compare'
 import { formatPercent } from '../../lib/format'
 import type { SubjectStats } from '../../lib/student-api'
 import {
@@ -51,6 +53,17 @@ export function AttendancePage() {
           </div>
         )
       },
+    },
+    {
+      key: 'classAvg',
+      header: 'Class avg',
+      align: 'right',
+      cell: (s) => <span className="tabular-nums">{formatPercent(s.class_avg_attendance_pct)}</span>,
+    },
+    {
+      key: 'diff',
+      header: 'You vs class',
+      cell: (s) => <DiffIndicator comparison={compare(s.attendance_pct, s.class_avg_attendance_pct)} />,
     },
     {
       key: 'needed',

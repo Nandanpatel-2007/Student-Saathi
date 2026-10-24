@@ -34,7 +34,7 @@ def world(faculty_user, student_user, section, department):
     for s in (mine, other):
         AttendanceRecord.objects.create(session=session, student=s, status="PRESENT")
     assessment = Assessment.objects.create(
-        teaching_assignment=assignment, title="Q", type="QUIZ", max_marks=10, weightage_percent=10, date=TODAY
+        teaching_assignment=assignment, title="Q", type="QUIZ", max_marks=10, date=TODAY
     )
     for s, m in ((mine, 9), (other, 4)):
         Mark.objects.create(assessment=assessment, student=s, marks_obtained=m)
@@ -64,12 +64,14 @@ def test_student_cannot_see_another_students_data(client, world):
     assert call(client, "get", f"/attendance/sessions/{world['session'].id}", "stu1").status_code == 403
 
 
-def test_student_percentile_reveals_only_own_standing(client, world):
+def test_student_sees_own_values_and_only_class_averages(client, world):
     mine = call(client, "get", "/students/me/dashboard", "stu1").json()["subjects"][0]
     theirs = call(client, "get", "/students/me/dashboard", "stu2").json()["subjects"][0]
-    assert mine["weighted_score"] == 90 and theirs["weighted_score"] == 40
-    assert mine["percentile"] == 75 and theirs["percentile"] == 25
-    assert set(mine) == set(theirs)  # no rank / classmate fields
+    assert mine["average_score_pct"] == 90 and theirs["average_score_pct"] == 40
+    # Both see the same class aggregate (mean of 90 and 40), never each other's figures by name.
+    assert mine["class_avg_score_pct"] == theirs["class_avg_score_pct"] == 65
+    assert set(mine) == set(theirs)
+    assert not {"rank", "percentile", "weighted_score"} & set(mine)  # no standing against classmates
 
 
 @pytest.mark.parametrize(
@@ -89,7 +91,7 @@ def test_student_percentile_reveals_only_own_standing(client, world):
         (
             "put",
             "/assessments/{assessment}",
-            {"title": "x", "type": "QUIZ", "max_marks": 10, "weightage_percent": 5, "date": "2025-01-01"},
+            {"title": "x", "type": "QUIZ", "max_marks": 10, "date": "2025-01-01"},
         ),
         ("delete", "/assessments/{assessment}", None),
         ("get", "/faculty/classes/{assignment}/summary", None),
@@ -148,7 +150,6 @@ def test_other_faculty_cannot_create_in_a_class(client, world):
                 "title": "Sneaky",
                 "type": "QUIZ",
                 "max_marks": 10,
-                "weightage_percent": 5,
                 "date": str(TODAY),
             },
         ).status_code

@@ -83,7 +83,6 @@ def test_end_to_end_flow(client, admin_user, faculty_user, student_user, section
             "title": "Midterm",
             "type": "MIDTERM",
             "max_marks": 50,
-            "weightage_percent": 100,
             "date": today,
         },
     ).json()
@@ -110,7 +109,8 @@ def test_end_to_end_flow(client, admin_user, faculty_user, student_user, section
     assert subj["subject"]["code"] == "CS301"
     assert (subj["present"], subj["absent"], subj["classes_held"]) == (1, 1, 2)
     assert subj["attendance_pct"] == 50 and body["attendance_overall"] == 50
-    assert subj["weighted_score"] == 40 and subj["class_avg"] == 60 and subj["percentile"] == 25
+    assert subj["average_score_pct"] == 40 and subj["class_avg_score_pct"] == 60
+    assert subj["class_avg_attendance_pct"] == 75  # mean of 50 and 100
     assert subj["classes_needed_for_threshold"] == 2  # (1+n)/(2+n) >= .75 -> n >= 2
     assert {a["code"] for a in body["alerts"]} == {"LOW_ATTENDANCE"}  # 40% is not below the 40% pass mark
     assert len(body["trend"]) >= 1
