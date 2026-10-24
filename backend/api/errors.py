@@ -42,6 +42,14 @@ class ErrorOut(Schema):
     error: ErrorBody
 
 
+class DetailedHttpError(HttpError):
+    """HttpError that carries per-field details into the standard error envelope."""
+
+    def __init__(self, status_code: int, message: str, details: list[dict] | None = None):
+        super().__init__(status_code, message)
+        self.details = details or []
+
+
 def error_payload(code: str, message: str, details: list[dict] | None = None) -> dict:
     return {"error": {"code": code, "message": message, "details": details or []}}
 
@@ -65,7 +73,7 @@ def register_error_handlers(api: NinjaAPI) -> None:
 
     @api.exception_handler(HttpError)
     def http_error(request, exc):
-        return _respond(api, request, exc.status_code, str(exc))
+        return _respond(api, request, exc.status_code, str(exc), details=getattr(exc, "details", None))
 
     @api.exception_handler(APIException)
     def jwt_error(request, exc):

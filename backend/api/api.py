@@ -8,6 +8,7 @@ from apps.academics.api import (
     subjects_router,
 )
 from apps.accounts.api import router as auth_router
+from apps.assessments.api import router as assessments_router
 from apps.attendance.api import router as attendance_router
 
 from .errors import register_error_handlers
@@ -28,3 +29,4 @@ api.add_router("/enrollments", enrollments_router)
 api.add_router("/teaching-assignments", assignments_router)
 api.add_router("/faculty", faculty_router)
 api.add_router("/attendance", attendance_router)
+api.add_router("/assessments", assessments_router)
