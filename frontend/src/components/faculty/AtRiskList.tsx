@@ -23,7 +23,7 @@ export function AtRiskList({ items }: { items: readonly AtRiskItem[] }) {
           {item.classLabel && <p className="mt-0.5 text-sm text-muted">{item.classLabel}</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {item.alerts.map((alert) => (
-              <AlertChip key={alert.code} alert={alert} />
+              <AlertChip key={alert.code} alert={alert} messageShown />
             ))}
           </div>
           <ul className="mt-2 space-y-0.5 text-sm text-muted">

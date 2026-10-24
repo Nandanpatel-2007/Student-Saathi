@@ -7,9 +7,20 @@ import { AdminHome } from './pages/AdminHome'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { NotFound } from './pages/NotFound'
-import { StudentHome } from './pages/StudentHome'
 
-// The faculty portal (and its charting library) loads only for faculty users.
+// The role portals (and the charting library) load only for the users who need them.
+const StudentLayout = lazy(() => import('./pages/student/StudentLayout').then((m) => ({ default: m.StudentLayout })))
+const StudentDashboardPage = lazy(() =>
+  import('./pages/student/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+)
+const StudentAttendancePage = lazy(() =>
+  import('./pages/student/AttendancePage').then((m) => ({ default: m.AttendancePage })),
+)
+const StudentPerformancePage = lazy(() =>
+  import('./pages/student/PerformancePage').then((m) => ({ default: m.PerformancePage })),
+)
+const StudentAlertsPage = lazy(() => import('./pages/student/AlertsPage').then((m) => ({ default: m.AlertsPage })))
+
 const FacultyLayout = lazy(() => import('./pages/faculty/FacultyLayout').then((m) => ({ default: m.FacultyLayout })))
 const DashboardPage = lazy(() => import('./pages/faculty/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const AttendancePage = lazy(() =>
@@ -29,7 +40,13 @@ export default function App() {
         <Route path="/login" element={<Login />} />
 
         <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
-          <Route path="/student/*" element={<StudentHome />} />
+          <Route path="/student" element={<StudentLayout />}>
+            <Route index element={<StudentDashboardPage />} />
+            <Route path="attendance" element={<StudentAttendancePage />} />
+            <Route path="performance" element={<StudentPerformancePage />} />
+            <Route path="alerts" element={<StudentAlertsPage />} />
+            <Route path="*" element={<Navigate to="/student" replace />} />
+          </Route>
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['FACULTY']} />}>

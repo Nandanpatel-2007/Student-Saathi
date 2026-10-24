@@ -28,12 +28,13 @@ const ALERT_LABEL: Record<Alert['code'], string> = {
 }
 
 /** Short chip; the API's own message (with its thresholds) is available to screen readers and on hover. */
-export function AlertChip({ alert }: { alert: Alert }) {
+export function AlertChip({ alert, messageShown = false }: { alert: Alert; messageShown?: boolean }) {
   return (
-    <span title={alert.message}>
+    <span title={messageShown ? undefined : alert.message}>
       <StatusBadge tone={alert.severity === 'critical' ? 'danger' : 'warning'}>
         {ALERT_LABEL[alert.code]}
-        <span className="sr-only">: {alert.message}</span>
+        {/* When the message is already printed next to the chip, don't read it twice. */}
+        {!messageShown && <span className="sr-only">: {alert.message}</span>}
       </StatusBadge>
     </span>
   )

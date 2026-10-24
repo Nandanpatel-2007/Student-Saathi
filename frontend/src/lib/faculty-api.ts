@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { apiDownload, apiRequest, buildQuery } from './api'
+import { alertSchema, type Alert } from './schemas'
 
 // ---------------------------------------------------------------- shared schemas
 
@@ -32,14 +33,6 @@ const studentBriefSchema = z.object({
   name: z.string(),
 })
 
-const alertSchema = z.object({
-  code: z.enum(['LOW_ATTENDANCE', 'ATTENDANCE_WARNING', 'FAILING_SUBJECT', 'SHARP_DROP']),
-  severity: z.enum(['critical', 'warning']),
-  message: z.string(),
-  subject_id: z.number().nullish(),
-  subject_code: z.string().nullish(),
-})
-
 function paged<T extends z.ZodType>(item: T) {
   return z.object({
     items: z.array(item),
@@ -53,7 +46,7 @@ function paged<T extends z.ZodType>(item: T) {
 export type Subject = z.infer<typeof subjectSchema>
 export type Section = z.infer<typeof sectionSchema>
 export type StudentBrief = z.infer<typeof studentBriefSchema>
-export type Alert = z.infer<typeof alertSchema>
+export type { Alert }
 export type Paged<T> = { items: T[]; count: number; page: number; page_size: number; total_pages: number }
 
 // ---------------------------------------------------------------- classes
