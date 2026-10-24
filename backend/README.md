@@ -47,6 +47,46 @@ ruff check .
 Settings modules: `config.settings.dev` (default for `manage.py` and pytest), `config.settings.prod` (default for WSGI/ASGI).
 Postgres needs `pip install psycopg[binary]`.
 
+Analytics rules are configurable (all optional):
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `ATTENDANCE_THRESHOLD_PERCENT` | `75` | Below this: `LOW_ATTENDANCE`; also the target for "classes needed" |
+| `ATTENDANCE_WARNING_UPPER_PERCENT` | `80` | `[threshold, this)` raises `ATTENDANCE_WARNING` |
+| `ATTENDANCE_LATE_COUNTS_AS_PRESENT` | `True` | `False` treats LATE as absent |
+| `ATTENDANCE_EXCUSED_POLICY` | `EXCLUDE` | `EXCLUDE` (out of the denominator), `PRESENT` or `ABSENT` |
+| `PASS_MARK_PERCENT` | `40` | Weighted score below this: `FAILING_SUBJECT` |
+| `SHARP_DROP_POINTS` | `15` | Drop between the last two assessments (strictly greater) |
+
+## Demo data
+
+```powershell
+python manage.py seed_demo           # 1 admin, 3 faculty, 2 sections, 30 students, 5 subjects, ~6 weeks of data
+python manage.py seed_demo --reset   # replace previously seeded demo data (touches nothing else)
+```
+
+All demo passwords are `demo1234`. Usernames: `admin`, `faculty1`-`faculty3`, `student01`-`student30`.
+At-risk students: `student03` (low attendance), `student18` (attendance warning), `student07` (failing),
+`student12` (sharp score drop), `student25` (low attendance + failing).
+
+## Endpoints (all under `/api/v1`)
+
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me` |
+| Academics | `/subjects`, `/sections`, `/enrollments` (+ `POST /enrollments/bulk`), `/teaching-assignments`, `GET /faculty/me/classes` |
+| Attendance | `POST/GET /attendance/sessions`, `GET /attendance/sessions/{id}`, `PUT /attendance/sessions/{id}/records` |
+| Assessments | `/assessments` CRUD, `GET/PUT /assessments/{id}/marks` |
+| Analytics | `GET /students/me/dashboard`, `GET /faculty/classes/{id}/summary`, `.../students`, `.../export?type=attendance\|marks` |
+
+Business rules worth knowing:
+
+- Attendance %: `LATE` counts as present; `EXCUSED` is excluded from the denominator (both configurable).
+- Weighted score: only graded assessments count (pending ones are ignored, an absence scores 0), normalised by the
+  weightage graded so far. Total weightage per teaching assignment (a subject taught to a section) is capped at 100.
+- Alerts are computed on every read; there is no background job.
+- `student_id` / `faculty_id` in request bodies are profile ids (`StudentProfile`, `FacultyProfile`).
+
 ## Conventions
 
 - **Roles:** `STUDENT`, `FACULTY`, `ADMIN` (`apps.accounts.models.Role`). Guard endpoints with

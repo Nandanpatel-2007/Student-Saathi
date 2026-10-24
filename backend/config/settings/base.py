@@ -95,3 +95,13 @@ NINJA_JWT = {
 # Pagination (see api/pagination.py)
 DEFAULT_PAGE_SIZE = env.int("DEFAULT_PAGE_SIZE", default=20)
 MAX_PAGE_SIZE = env.int("MAX_PAGE_SIZE", default=100)
+
+# Analytics (see apps/analytics/services.py)
+ATTENDANCE_THRESHOLD_PERCENT = env.float("ATTENDANCE_THRESHOLD_PERCENT", default=75.0)
+ATTENDANCE_WARNING_UPPER_PERCENT = env.float("ATTENDANCE_WARNING_UPPER_PERCENT", default=80.0)
+# LATE counts as present when True; otherwise as absent.
+ATTENDANCE_LATE_COUNTS_AS_PRESENT = env.bool("ATTENDANCE_LATE_COUNTS_AS_PRESENT", default=True)
+# How EXCUSED is treated: EXCLUDE (dropped from the denominator), PRESENT, or ABSENT.
+ATTENDANCE_EXCUSED_POLICY = env.str("ATTENDANCE_EXCUSED_POLICY", default="EXCLUDE").upper()
+PASS_MARK_PERCENT = env.float("PASS_MARK_PERCENT", default=40.0)
+SHARP_DROP_POINTS = env.float("SHARP_DROP_POINTS", default=15.0)

@@ -58,3 +58,19 @@ def login(client, username, password=PASSWORD):
 def auth_header(client, username):
     token = login(client, username).json()["access"]
     return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+
+
+def call(client, method, path, user=None, body=None):
+    """JSON request to /api/v1 as `user` (None = anonymous)."""
+    import json
+
+    kwargs = auth_header(client, user) if user else {}
+    if body is not None:
+        kwargs.update(data=json.dumps(body), content_type="application/json")
+    return getattr(client, method)(f"/api/v1{path}", **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def fast_password_hasher(settings):
+    """PBKDF2 is deliberately slow; tests log in constantly."""
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
