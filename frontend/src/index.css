@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ tokens
+   Light is the default; dark applies when the OS prefers it, unless the user
+   picked a theme explicitly (html[data-theme]). */
+:root {
+  color-scheme: light;
+  --canvas: #fbfbfa;
+  --surface: #ffffff;
+  --surface-alt: #f2f2ef;
+  --line: #e4e4df;
+  --ink: #17171c;
+  --muted: #5b5b66;
+
+  --accent: #3730a3;
+  --accent-hover: #312e81;
+  --on-accent: #ffffff;
+  --accent-text: #3730a3;
+  --accent-soft: #eceefe;
+  --ring: #4f46e5;
+
+  --warn-bg: #fef3c7;
+  --warn-ink: #78350f;
+  --warn-bar: #b45309;
+
+  --band: #312e81;
+  --on-band: #ffffff;
+  --on-band-muted: #c7d2fe;
+  --band-btn: #ffffff;
+  --band-btn-ink: #312e81;
+
+  --particle-rgb: 55, 48, 163;
+  --card-shadow: 0 24px 60px -24px rgb(23 23 28 / 0.28), 0 2px 8px rgb(23 23 28 / 0.06);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #0e0e13;
+  --surface: #16161d;
+  --surface-alt: #1d1d26;
+  --line: #2a2a36;
+  --ink: #f1f1f4;
+  --muted: #a3a3b0;
+
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --on-accent: #0e0e13;
+  --accent-text: #a5b4fc;
+  --accent-soft: #23234a;
+  --ring: #a5b4fc;
+
+  --warn-bg: #422006;
+  --warn-ink: #fcd34d;
+  --warn-bar: #f59e0b;
+
+  --band: #1e1b4b;
+  --on-band: #f1f1f4;
+  --on-band-muted: #c7d2fe;
+  --band-btn: #c7d2fe;
+  --band-btn-ink: #1e1b4b;
+
+  --particle-rgb: 165, 180, 252;
+  --card-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --canvas: #0e0e13;
+    --surface: #16161d;
+    --surface-alt: #1d1d26;
+    --line: #2a2a36;
+    --ink: #f1f1f4;
+    --muted: #a3a3b0;
+
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --on-accent: #0e0e13;
+    --accent-text: #a5b4fc;
+    --accent-soft: #23234a;
+    --ring: #a5b4fc;
+
+    --warn-bg: #422006;
+    --warn-ink: #fcd34d;
+    --warn-bar: #f59e0b;
+
+    --band: #1e1b4b;
+    --on-band: #f1f1f4;
+    --on-band-muted: #c7d2fe;
+    --band-btn: #c7d2fe;
+    --band-btn-ink: #1e1b4b;
+
+    --particle-rgb: 165, 180, 252;
+    --card-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+}
+
+/* Expose tokens as Tailwind utilities: bg-canvas, text-ink, border-line, ... */
+@theme inline {
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-bar: var(--warn-bar);
+  --color-band: var(--band);
+  --color-on-band: var(--on-band);
+  --color-on-band-muted: var(--on-band-muted);
+  --color-band-btn: var(--band-btn);
+  --color-band-btn-ink: var(--band-btn-ink);
+  --shadow-card: var(--card-shadow);
+}
+
+/* ------------------------------------------------------------------ base */
+html {
+  background: var(--canvas);
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ------------------------------------------------------------------ motion */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-reveal][data-revealed='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
