@@ -22,6 +22,9 @@
   --warn-bg: #fef3c7;
   --warn-ink: #78350f;
   --warn-bar: #b45309;
+  --danger-bg: #fef2f2;
+  --danger-ink: #991b1b;
+  --danger-line: #fca5a5;
 
   --band: #312e81;
   --on-band: #ffffff;
@@ -52,6 +55,9 @@
   --warn-bg: #422006;
   --warn-ink: #fcd34d;
   --warn-bar: #f59e0b;
+  --danger-bg: #2a1214;
+  --danger-ink: #fecaca;
+  --danger-line: #7f1d1d;
 
   --band: #1e1b4b;
   --on-band: #f1f1f4;
@@ -83,6 +89,9 @@
     --warn-bg: #422006;
     --warn-ink: #fcd34d;
     --warn-bar: #f59e0b;
+    --danger-bg: #2a1214;
+    --danger-ink: #fecaca;
+    --danger-line: #7f1d1d;
 
     --band: #1e1b4b;
     --on-band: #f1f1f4;
@@ -114,6 +123,10 @@
   --color-warn-bg: var(--warn-bg);
   --color-warn-ink: var(--warn-ink);
   --color-warn-bar: var(--warn-bar);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-line: var(--danger-line);
+  --color-ring: var(--ring);
   --color-band: var(--band);
   --color-on-band: var(--on-band);
   --color-on-band-muted: var(--on-band-muted);
@@ -187,4 +200,12 @@ h3 {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Very subtle static dot grid (login page backdrop), faded toward the edges. */
+.dot-pattern {
+  background-image: radial-gradient(rgba(var(--particle-rgb), 0.22) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%);
 }
